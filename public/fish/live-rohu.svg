@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" role="img" aria-labelledby="ttl">
+  <title id="ttl">Live rohu fish illustration</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b3437"/><stop offset="1" stop-color="#195853"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="46%" r="58%"><stop offset="0" stop-color="#7cb6a7" stop-opacity=".42"/><stop offset="1" stop-color="#0b3437" stop-opacity="0"/></radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9dad0"/><stop offset=".42" stop-color="#94b3a7"/><stop offset=".78" stop-color="#628d82"/><stop offset="1" stop-color="#3f6a62"/></linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#dfb77e"/><stop offset="1" stop-color="#a36f3a"/></linearGradient>
+    <pattern id="scales" width="28" height="19" patternUnits="userSpaceOnUse"><path d="M0 19 Q14 1 28 19" fill="none" stroke="#eef5ea" stroke-opacity=".32" stroke-width="1.3"/></pattern>
+    <clipPath id="clip"><path d="M447 276 C447 212 376 186 302 196 C240 204 197 236 178 272 C197 308 240 340 302 348 C376 358 447 340 447 276 Z"/></clipPath>
+  </defs>
+  <rect width="640" height="540" fill="url(#bg)"/>
+  <circle cx="320" cy="270" r="216" fill="url(#glow)"/>
+  <circle cx="320" cy="270" r="208" fill="none" stroke="#d7e8dc" stroke-opacity=".16"/>
+  <circle cx="320" cy="270" r="174" fill="none" stroke="#d7e8dc" stroke-opacity=".08"/>
+  <g stroke="#cfe4d8" stroke-opacity=".18" fill="none">
+    <path d="M52 432 Q162 400 272 432 T492 432 T700 432" stroke-width="2"/>
+    <path d="M30 466 Q150 430 270 466 T510 466 T700 466"/>
+  </g>
+  <g opacity=".7" stroke="#bcd9cb" fill="none" stroke-width="1.6">
+    <circle cx="512" cy="146" r="7"/><circle cx="540" cy="112" r="4"/><circle cx="556" cy="172" r="3"/>
+  </g>
+  <path d="M184 274 C150 250 120 220 100 206 C112 246 118 260 104 276 C118 292 112 306 100 346 C120 332 150 300 184 278 Z" fill="url(#fin)" opacity=".92"/>
+  <path d="M282 198 C300 158 356 158 392 202 C356 190 316 190 282 198 Z" fill="url(#fin)" opacity=".9"/>
+  <path d="M356 320 C372 344 402 356 420 352 C404 330 388 318 368 312 Z" fill="url(#fin)" opacity=".85"/>
+  <path d="M447 276 C447 212 376 186 302 196 C240 204 197 236 178 272 C197 308 240 340 302 348 C376 358 447 340 447 276 Z" fill="url(#body)"/>
+  <g clip-path="url(#clip)"><rect x="150" y="150" width="330" height="240" fill="url(#scales)"/><ellipse cx="330" cy="220" rx="118" ry="30" fill="#eef6ee" opacity=".2"/></g>
+  <path d="M447 276 C447 212 376 186 302 196 C240 204 197 236 178 272 C197 308 240 340 302 348 C376 358 447 340 447 276 Z" fill="none" stroke="#dcebe0" stroke-opacity=".35" stroke-width="1.6"/>
+  <path d="M394 232 C380 252 380 300 394 320" fill="none" stroke="#426a62" stroke-width="2.2" opacity=".65"/>
+  <path d="M330 204 C356 202 380 210 396 226" fill="none" stroke="#e7f1e8" stroke-width="2" opacity=".4"/>
+  <circle cx="414" cy="262" r="12" fill="#f5f0e0"/>
+  <circle cx="416" cy="262" r="6.4" fill="#203832"/>
+  <circle cx="413" cy="259" r="2" fill="#ffffff" opacity=".85"/>
+  <path d="M430 300 Q450 296 462 282" fill="none" stroke="#3f6a62" stroke-width="2" opacity=".5"/>
+  <circle cx="120" cy="404" r="4" fill="#cfe4d8" opacity=".28"/>
+  <circle cx="152" cy="386" r="2.5" fill="#cfe4d8" opacity=".22"/>
+</svg>

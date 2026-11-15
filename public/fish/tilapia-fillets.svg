@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 540" role="img" aria-labelledby="ttl">
+  <title id="ttl">Fresh tilapia fillets illustration</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0c3538"/><stop offset="1" stop-color="#1d5955"/></linearGradient>
+    <radialGradient id="glow" cx="50%" cy="44%" r="58%"><stop offset="0" stop-color="#8dbfae" stop-opacity=".42"/><stop offset="1" stop-color="#0c3538" stop-opacity="0"/></radialGradient>
+    <linearGradient id="meat" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f7dfc6"/><stop offset=".5" stop-color="#efc6a6"/><stop offset="1" stop-color="#d99d7d"/></linearGradient>
+    <linearGradient id="meat2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2d3b6"/><stop offset=".55" stop-color="#e6b491"/><stop offset="1" stop-color="#c98a68"/></linearGradient>
+    <linearGradient id="ice" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9f0e7" stop-opacity=".7"/><stop offset="1" stop-color="#9dcfc4" stop-opacity=".25"/></linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c08a52"/><stop offset="1" stop-color="#8d5f33"/></linearGradient>
+  </defs>
+  <rect width="640" height="540" fill="url(#bg)"/>
+  <circle cx="320" cy="270" r="220" fill="url(#glow)"/>
+  <circle cx="320" cy="270" r="208" fill="none" stroke="#d7e8dc" stroke-opacity=".16"/>
+  <circle cx="320" cy="270" r="172" fill="none" stroke="#d7e8dc" stroke-opacity=".08"/>
+  <g stroke="#cfe4d8" stroke-opacity=".17" fill="none">
+    <path d="M44 432 Q160 400 276 432 T508 432 T700 432" stroke-width="2"/>
+    <path d="M24 466 Q150 430 276 466 T528 466 T700 466"/>
+  </g>
+  <g>
+    <rect x="150" y="356" width="66" height="52" rx="10" fill="url(#ice)" transform="rotate(-8 183 382)"/>
+    <rect x="402" y="346" width="80" height="58" rx="12" fill="url(#ice)" transform="rotate(11 442 375)"/>
+    <rect x="256" y="384" width="58" height="44" rx="9" fill="url(#ice)" transform="rotate(4 285 406)"/>
+    <rect x="330" y="140" width="52" height="40" rx="8" fill="url(#ice)" transform="rotate(-14 356 160)"/>
+  </g>
+  <path d="M206 336 C216 268 276 208 360 192 C404 183 432 200 428 232 C424 274 362 326 292 356 C248 375 199 370 206 336 Z" fill="url(#meat2)"/>
+  <path d="M214 322 C228 268 282 220 354 202 C392 193 414 204 410 228 C406 262 350 306 288 332 C250 348 208 348 214 322 Z" fill="url(#meat)"/>
+  <path d="M206 336 C216 268 276 208 360 192 C404 183 432 200 428 232" fill="none" stroke="url(#skin)" stroke-width="9" stroke-linecap="round" opacity=".9"/>
+  <path d="M232 312 C254 274 300 240 350 224" fill="none" stroke="#fdf1e4" stroke-opacity=".65" stroke-width="5" stroke-linecap="round"/>
+  <path d="M432 292 C414 350 360 404 286 428 C246 440 218 428 224 402 C232 366 292 328 358 302 C398 286 438 272 432 292 Z" fill="url(#meat2)"/>
+  <path d="M420 292 C404 338 356 380 294 400 C260 410 240 402 246 382 C254 352 306 320 360 300 C392 288 422 278 420 292 Z" fill="url(#meat)"/>
+  <path d="M432 292 C414 350 360 404 286 428 C246 440 218 428 224 402" fill="none" stroke="url(#skin)" stroke-width="8" stroke-linecap="round" opacity=".85"/>
+  <path d="M392 312 C368 344 330 370 292 384" fill="none" stroke="#fdf1e4" stroke-opacity=".55" stroke-width="4" stroke-linecap="round"/>
+  <g transform="translate(462 366) rotate(18)">
+    <circle cx="0" cy="0" r="30" fill="#dceb9c" opacity=".92"/>
+    <circle cx="0" cy="0" r="24" fill="#eef6c4"/>
+    <path d="M-24 0 H24 M0 -24 V24 M-17 -17 L17 17 M17 -17 L-17 17" stroke="#b9d370" stroke-width="1.6" opacity=".75"/>
+  </g>
+  <path d="M158 250 C184 228 214 218 242 220" fill="none" stroke="#b9d8c8" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+  <circle cx="176" cy="228" r="4" fill="#b9d8c8" opacity=".35"/>
+</svg>
