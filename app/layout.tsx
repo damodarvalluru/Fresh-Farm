@@ -1,7 +1,9 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { DM_Sans, Inter, Playfair_Display } from 'next/font/google'
+import MotionLayer from '@/components/motion-layer'
 import './globals.css'
+import './animations.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm-sans', display: 'swap' })
@@ -47,6 +49,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${dmSans.variable} ${playfair.variable}`}>
       <body className="antialiased">
         {children}
+        <MotionLayer />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

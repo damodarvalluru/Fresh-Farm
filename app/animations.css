@@ -1,0 +1,213 @@
+/* ============================================================
+   Fresh Farm — animation-only enhancement layer
+   Motion is inert unless JS is running and .fx-on is present.
+   ============================================================ */
+:root{
+  --fx-ease:cubic-bezier(.16,1,.3,1);
+  --fx-ease-io:cubic-bezier(.65,0,.35,1);
+  --fx-stagger:80ms;
+}
+.fx-on [data-fx]{ will-change:opacity,transform; }
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
+}
+
+/* ---- scroll reveal: blur-to-sharp + stagger ---- */
+.fx-on [data-fx="reveal"]{
+  opacity:0;
+  transform:translate3d(0,40px,0);
+  filter:blur(8px);
+  transition:opacity 1s var(--fx-ease),transform 1.1s var(--fx-ease),filter 1s var(--fx-ease);
+  transition-delay:calc(var(--i,0) * var(--fx-stagger));
+}
+.fx-on [data-fx="reveal"][data-in]{ opacity:1; transform:none; filter:none; }
+
+/* ---- image reveal: clip wipe (no transform override; existing zoom/hover stays intact) ---- */
+.fx-on [data-fx="img"]{
+  clip-path:inset(0 0 100% 0);
+  transition:clip-path 1.2s var(--fx-ease-io);
+}
+.fx-on [data-fx="img"][data-in]{ clip-path:inset(0 0 0 0); }
+
+/* ---- headline: masked word rise (keeps <em> and <br> intact) ---- */
+[data-fx="words"] .w{
+  display:inline-block;
+  overflow:hidden;
+  vertical-align:top;
+  padding:0 .05em .1em;
+  margin:0 -.05em;
+}
+[data-fx="words"] .w > span{
+  display:inline-block;
+  transform:translateY(110%);
+  transition:transform 1.1s var(--fx-ease);
+  transition-delay:calc(var(--i,0) * 70ms);
+}
+[data-fx="words"][data-in] .w > span{ transform:none; }
+
+/* ---- one restrained slice-glitch on the hero headline ---- */
+@keyframes fx-slice{
+  0%{ clip-path:inset(0 0 85% 0); transform:translateX(-5px); }
+  25%{ clip-path:inset(38% 0 34% 0); transform:translateX(4px); }
+  50%{ clip-path:inset(68% 0 6% 0); transform:translateX(-2px); }
+  75%{ clip-path:inset(12% 0 58% 0); transform:translateX(1px); }
+  100%{ clip-path:inset(0); transform:none; }
+}
+[data-fx-slice][data-in]{ animation:fx-slice .6s steps(5) both; }
+
+/* ---- pointer tilt on product cards (fine pointers only) ---- */
+@media (hover:hover) and (pointer:fine){
+  .fx-on [data-fx-tilt]{
+    position:relative;
+    transform-style:preserve-3d;
+    transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));
+    transition:transform .6s var(--fx-ease);
+  }
+  .fx-on [data-fx-tilt]::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    z-index:1;
+    border-radius:inherit;
+    pointer-events:none;
+    background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.16),transparent 55%);
+    opacity:0;
+    transition:opacity .4s;
+  }
+  .fx-on [data-fx-tilt]:hover::after{ opacity:1; }
+}
+
+/* ---- card swap when a filter tab changes ---- */
+@keyframes fx-card-in{
+  from{ opacity:0; transform:translate3d(48px,0,0) rotateY(-16deg) scale(.96); filter:blur(6px); }
+  to{ opacity:1; transform:none; filter:none; }
+}
+.fx-on [data-fx-swap] [data-fx="card"]{
+  animation:fx-card-in .8s var(--fx-ease) both;
+  animation-delay:calc(var(--i,0) * 60ms);
+}
+
+/* ---- glow border on nav pills and buttons (currentColor only) ---- */
+@property --fx-a{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+.fx-on [data-fx="glow"]{ position:relative; }
+.fx-on [data-fx="glow"]::before{
+  content:"";
+  position:absolute;
+  inset:-1px;
+  z-index:1;
+  border-radius:inherit;
+  padding:1px;
+  pointer-events:none;
+  background:conic-gradient(from var(--fx-a),transparent 0 70%,currentColor 85%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  opacity:0;
+  transition:opacity .4s;
+}
+.fx-on [data-fx="glow"]:hover::before,
+.fx-on [data-fx="glow"]:focus-visible::before{ opacity:1; animation:fx-spin 2.4s linear infinite; }
+@keyframes fx-spin{ to{ --fx-a:360deg; } }
+
+/* underline wipe on text nav links */
+.fx-on [data-fx="link"]{ position:relative; }
+.fx-on [data-fx="link"]::after{
+  content:"";
+  position:absolute;
+  left:0; right:0; bottom:-3px;
+  height:1px;
+  background:currentColor;
+  opacity:.7;
+  transform:scaleX(0);
+  transform-origin:left;
+  transition:transform .5s var(--fx-ease);
+}
+.fx-on [data-fx="link"]:hover::after,
+.fx-on [data-fx="link"]:focus-visible::after{ transform:scaleX(1); }
+
+/* ---- ambient light streak + soft heading bloom (warm existing palette) ---- */
+.fx-streak{
+  position:absolute;
+  top:-10%; right:-5%;
+  width:28%; height:120%;
+  z-index:0;
+  pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(198,147,81,.10),transparent);
+  filter:blur(14px);
+  mix-blend-mode:soft-light;
+  animation:fx-streak 9s var(--fx-ease-io) infinite alternate;
+}
+@keyframes fx-streak{
+  from{ transform:translateX(0) skewX(-18deg); opacity:.16; }
+  to{ transform:translateX(-12%) skewX(-18deg); opacity:.5; }
+}
+[data-fx-bloom]{ position:relative; }
+[data-fx-bloom]::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  z-index:-1;
+  pointer-events:none;
+  opacity:0;
+  background:radial-gradient(circle,rgba(198,147,81,.16),transparent 60%);
+}
+[data-fx-bloom][data-in]::before{ animation:fx-bloom 1.2s var(--fx-ease) both; }
+@keyframes fx-bloom{
+  0%{ opacity:0; transform:scale(.6); }
+  35%{ opacity:.55; }
+  100%{ opacity:0; transform:scale(1.8); }
+}
+
+/* ---- header, announcement and scroll-label entrances ---- */
+.fx-on .announcement{ animation:fx-fade-in 1.2s var(--fx-ease) both; }
+.fx-on .site-header{ animation:fx-header-in .9s var(--fx-ease) both; }
+@keyframes fx-fade-in{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes fx-header-in{ from{ opacity:0; transform:translateY(-14px); } to{ opacity:1; transform:none; } }
+.fx-on .hero-bottom-label{ animation:fx-bob 3.4s ease-in-out infinite; }
+@keyframes fx-bob{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(5px); } }
+
+/* ---- small details: promise numbers, stars ---- */
+/* Reserve the final width so counting up never shifts surrounding content. */
+.fx-on [data-fx-count]{ display:inline-block; min-width:4ch; }
+@keyframes fx-star{ to{ opacity:1; transform:none; } }
+.fx-on [data-fx-stars][data-in] .s{
+  display:inline-block;
+  opacity:0;
+  transform:scale(.4);
+  animation:fx-star .45s var(--fx-ease) forwards;
+  animation-delay:calc(var(--i,0) * 60ms);
+}
+
+/* ---- loader: line-draw then curtain lift ---- */
+.fx-loader{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  background:var(--paper,#fffef9);
+  color:var(--ink,#25372c);
+  clip-path:inset(0 0 0 0);
+  transition:clip-path .9s var(--fx-ease-io);
+}
+.fx-loader[data-done]{ clip-path:inset(0 0 100% 0); pointer-events:none; }
+.fx-loader svg path{
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.5;
+  stroke-dasharray:400;
+  stroke-dashoffset:400;
+  animation:fx-draw 1.1s var(--fx-ease-io) forwards;
+}
+@keyframes fx-draw{ to{ stroke-dashoffset:0; } }
+.fx-loader strong{ font:600 23px var(--font-playfair),Georgia,serif; letter-spacing:-1.1px; }
+.fx-loader small{ margin-top:-10px; color:var(--muted,#767c70); font:600 7px var(--font-dm-sans),sans-serif; letter-spacing:1.35px; }
