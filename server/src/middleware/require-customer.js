@@ -14,7 +14,7 @@ async function loadCustomer(uid) {
   const [rows] = await db.execute(
     `SELECT u.id, u.email, u.full_name, u.phone, u.created_at, r.name AS role
      FROM users u JOIN roles r ON r.id = u.role_id
-     WHERE u.firebase_uid = ? AND u.is_active = 1 LIMIT 1`,
+     WHERE u.firebase_uid = ? AND u.is_active = 1 AND r.name = 'CUSTOMER' LIMIT 1`,
     [uid],
   )
   return rows[0] || null

@@ -125,14 +125,16 @@ router.get('/admin/setup-status', async (_req, res, next) => {
     const rows = await staffAccounts()
     const configured = Boolean(process.env.ADMIN_PASSWORD_HASH?.startsWith('$argon2id$'))
     const hasCredentials = rows.length === 1 && Boolean(rows[0].password_hash || rows[0].pin_hash)
+    // This endpoint is public so the login screen can decide which form to
+    // show. Never expose staff identity here: only non-identifying flags are
+    // safe to return before authentication.
     res.json({
       configured,
       adminProvisioned: rows.length > 0,
       setupRequired: configured && !hasCredentials && rows.length <= 1,
       hasPassword: Boolean(rows[0]?.password_hash),
       hasPin: Boolean(rows[0]?.pin_hash),
-      adminEmail: rows.length === 1 ? rows[0].email : null,
-      adminName: rows.length === 1 ? rows[0].full_name : null,
+      emailRequired: rows.length !== 1,
     })
   } catch (error) { next(error) }
 })

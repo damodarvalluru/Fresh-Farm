@@ -85,8 +85,7 @@ type AdminSetupStatus = {
   setupRequired: boolean
   hasPassword: boolean
   hasPin: boolean
-  adminEmail: string | null
-  adminName: string | null
+  emailRequired: boolean
 }
 
 type AdminMode = 'password' | 'pin' | 'setup' | 'reset'
@@ -192,7 +191,7 @@ export function AdminLogin() {
     finally { setBusy(false) }
   }
 
-  const askForEmail = Boolean(status && !status.adminEmail) || Boolean(statusError)
+  const askForEmail = Boolean(status?.emailRequired) || Boolean(statusError)
   const headline = mode === 'setup' ? <>Set up the<br/><em>farmhouse.</em></> : mode === 'reset' ? <>Restore staff<br/><em>access.</em></> : <>Welcome to the<br/><em>farmhouse.</em></>
   const intro = mode === 'setup'
     ? 'Confirm the owner bootstrap password from the server, then choose the password and PIN you will use from now on.'
@@ -210,7 +209,7 @@ export function AdminLogin() {
 
       {status?.setupRequired && mode === 'setup' && <div className="admin-setup-note">
         <b>First-time owner setup</b>
-        <span>{status.adminName ? `${status.adminName} · ${status.adminEmail}` : 'No staff credentials are set yet.'} The bootstrap password is checked server-side and is never stored in the browser.</span>
+        <span>{status.adminProvisioned ? 'An owner account already exists on this server.' : 'No staff credentials are set yet.'} The bootstrap password is checked server-side and is never stored in the browser.</span>
       </div>}
 
       {status && !status.configured && mode !== 'setup' && <div className="admin-setup-note warn">

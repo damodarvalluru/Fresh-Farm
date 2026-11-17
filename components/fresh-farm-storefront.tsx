@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
 import { ArrowDown, ArrowRight, Check, ChevronDown, Clock3, Droplets, Fish, Leaf, MapPin, Menu, Minus, Plus, Scale, Search, ShieldCheck, ShoppingBag, Snowflake, Truck, X } from 'lucide-react'
 import { getFirebaseAuth } from '@/lib/firebase-client'
@@ -32,13 +32,13 @@ const fallbackProducts: Product[] = [
   { id: 4, name: 'Chicken Drumsticks', category: 'Chicken cuts', section: 'chicken', detail: 'Juicy cuts · 4–6 pieces', price: 295, unit: '/ kg', image: 'https://images.unsplash.com/photo-1527477396000-e27163b481c2?auto=format&fit=crop&w=900&q=85', availableQuantity: null },
   { id: 5, name: 'Live Country Hen', category: 'Live hens', section: 'chicken', detail: 'Healthy, locally raised birds', price: 1250, unit: '/ bird', image: 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&w=900&q=85', badge: 'Limited', availableQuantity: null },
   { id: 6, name: 'Fresh Chicken Wings', category: 'Chicken cuts', section: 'chicken', detail: 'Cleaned and ready to cook', price: 270, unit: '/ kg', image: 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?auto=format&fit=crop&w=900&q=85', availableQuantity: null },
-  { id: 101, name: 'Live Rohu', category: 'Live fish', section: 'fish', detail: 'Live · approx. 1–1.5 kg', price: 220, unit: '/ kg', image: '/fish/live-rohu.svg', badge: 'Live & fresh', availableQuantity: 30 },
-  { id: 102, name: 'Live Katla', category: 'Live fish', section: 'fish', detail: 'Live · approx. 1.5–2 kg', price: 260, unit: '/ kg', image: '/fish/live-katla.svg', badge: 'Limited', availableQuantity: 20 },
-  { id: 103, name: 'Fresh Pomfret', category: 'Fresh whole fish', section: 'fish', detail: 'Whole · cleaned on request · 400–600 g', price: 780, unit: '/ kg', image: '/fish/fresh-pomfret.svg', badge: 'Today’s catch', availableQuantity: 18 },
-  { id: 104, name: 'Fresh Mackerel', category: 'Fresh whole fish', section: 'fish', detail: 'Whole · cleaned on request', price: 340, unit: '/ kg', image: '/fish/fresh-mackerel.svg', availableQuantity: 35 },
-  { id: 105, name: 'Tilapia Fillets', category: 'Fish fillets & steaks', section: 'fish', detail: 'Boneless · skinless · 400 g+', price: 420, unit: '/ kg', image: '/fish/tilapia-fillets.svg', badge: 'Chef’s pick', availableQuantity: 25 },
-  { id: 106, name: 'Basa Fillets', category: 'Fish fillets & steaks', section: 'fish', detail: 'Boneless · fresh, never frozen', price: 380, unit: '/ kg', image: '/fish/basa-fillets.svg', availableQuantity: 30 },
-  { id: 107, name: 'Seer Fish Steaks', category: 'Fish fillets & steaks', section: 'fish', detail: 'Thick-cut · 2–3 steaks', price: 950, unit: '/ kg', image: '/fish/seer-fish-steaks.svg', badge: 'Premium', availableQuantity: 12 },
+  { id: 101, name: 'Live Rohu', category: 'Live fish', section: 'fish', detail: 'Live · approx. 1–1.5 kg', price: 220, unit: '/ kg', image: '/fish/live-rohu.jpg', badge: 'Live & fresh', availableQuantity: 30 },
+  { id: 102, name: 'Live Katla', category: 'Live fish', section: 'fish', detail: 'Live · approx. 1.5–2 kg', price: 260, unit: '/ kg', image: '/fish/live-katla.jpg', badge: 'Limited', availableQuantity: 20 },
+  { id: 103, name: 'Fresh Pomfret', category: 'Fresh whole fish', section: 'fish', detail: 'Whole · cleaned on request · 400–600 g', price: 780, unit: '/ kg', image: '/fish/fresh-pomfret.jpg', badge: 'Today’s catch', availableQuantity: 18 },
+  { id: 104, name: 'Fresh Mackerel', category: 'Fresh whole fish', section: 'fish', detail: 'Whole · cleaned on request', price: 340, unit: '/ kg', image: '/fish/fresh-mackerel.jpg', availableQuantity: 35 },
+  { id: 105, name: 'Tilapia Fillets', category: 'Fish fillets & steaks', section: 'fish', detail: 'Boneless · skinless · 400 g+', price: 420, unit: '/ kg', image: '/fish/tilapia-fillets.jpg', badge: 'Chef’s pick', availableQuantity: 25 },
+  { id: 106, name: 'Basa Fillets', category: 'Fish fillets & steaks', section: 'fish', detail: 'Boneless · fresh, never frozen', price: 380, unit: '/ kg', image: '/fish/basa-fillets.jpg', availableQuantity: 30 },
+  { id: 107, name: 'Seer Fish Steaks', category: 'Fish fillets & steaks', section: 'fish', detail: 'Thick-cut · 2–3 steaks', price: 950, unit: '/ kg', image: '/fish/seer-fish-steaks.jpg', badge: 'Premium', availableQuantity: 12 },
 ]
 
 const sectionLabels: Record<Section, string> = { chicken: 'Chicken', fish: 'Fish' }
@@ -86,6 +86,7 @@ function ProductCard({ product, index, quantity, onAdd }: { product: Product; in
         <div>
           <h3>{product.name}</h3>
           <p>{product.detail}</p>
+          {product.description && <p className="product-description">{product.description}</p>}
           {stock && <span className={`stock-line is-${stock.state}`}>{stock.label}</span>}
         </div>
         <div className="product-price"><b>₹{product.price}</b><small>{product.unit}</small></div>
@@ -190,6 +191,31 @@ export default function FreshFarmStorefront() {
   const [search, setSearch] = useState('')
   const [placedOrder, setPlacedOrder] = useState<{ orderNumber: string; total: number; paymentStatus: string } | null>(null)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const cartDrawerRef = useRef<HTMLElement>(null)
+  const closeBagRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!cartOpen) return
+    const previousFocus = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    closeBagRef.current?.focus()
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') { setCartOpen(false); setCheckoutOpen(false); return }
+      if (event.key !== 'Tab' || !cartDrawerRef.current) return
+      const focusable = Array.from(cartDrawerRef.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(el => el.offsetParent !== null)
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus?.()
+    }
+  }, [cartOpen])
 
   const chickenProducts = useMemo(() => products.filter(product => product.section === 'chicken'), [products])
   const fishProducts = useMemo(() => products.filter(product => product.section === 'fish'), [products])
@@ -212,16 +238,17 @@ export default function FreshFarmStorefront() {
 
   return (
     <main className="farm-site">
+      <a className="skip-link" href="#shop">Skip to the shop</a>
       <FlowerCelebration active={Boolean(placedOrder)} />
       <div className="announcement"><span><Leaf size={14} /> FRESH CHICKEN &amp; TODAY&apos;S CATCH, EVERY SINGLE DAY</span><span className="announcement-right">Free delivery on orders above ₹999 <ArrowRight size={13} /></span></div>
       <header className="site-header">
         <Link className="admin-entry" href="/admin/login" aria-label="Admin sign in"><ShieldCheck size={16} /><span>Admin</span></Link>
-        <button className="icon-button mobile-menu" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><Menu size={21} /></button>
+        <button className="icon-button mobile-menu" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-expanded={menuOpen} aria-controls="freshfarm-main-nav" onClick={() => setMenuOpen(!menuOpen)}><Menu size={21} /></button>
         <a className="brand" href="#home" aria-label="freshfarm good food, grown with care"><span className="brand-mark"><Leaf size={21} /></span><span>fresh<span className="brand-light">farm</span>{' '}<small>GOOD FOOD, GROWN WITH CARE</small></span></a>
-        <nav className={menuOpen ? 'main-nav is-open' : 'main-nav'} aria-label="Main navigation"><a href="#shop" onClick={() => setMenuOpen(false)}>Chicken</a><a href="#fish" onClick={() => setMenuOpen(false)}>Fish</a><a href="#story" onClick={() => setMenuOpen(false)}>Our story</a><a href="#promise" onClick={() => setMenuOpen(false)}>Our promise</a><a href="#reviews" onClick={() => setMenuOpen(false)}>Reviews</a></nav>
-        <div className="header-actions"><button className="icon-button search-trigger" aria-label="Search products" onClick={() => setSearchOpen(!searchOpen)}><Search size={20} /></button><Link className="account-link" href={signedInUser ? '/dashboard' : '/login'}>{signedInUser ? `My dashboard` : 'Sign in'}</Link><button className="bag-button" onClick={() => { setCartOpen(true); setPlacedOrder(null); setCheckoutOpen(false) }} aria-label={`Bag ${formatQuantity(count)} item${count === 1 ? '' : 's'}`}><ShoppingBag size={18} /><span>Bag</span>{' '}<b>{formatQuantity(count)}</b></button></div>
+        <nav id="freshfarm-main-nav" className={menuOpen ? 'main-nav is-open' : 'main-nav'} aria-label="Main navigation"><a href="#shop" onClick={() => setMenuOpen(false)}>Chicken</a><a href="#fish" onClick={() => setMenuOpen(false)}>Fish</a><a href="#story" onClick={() => setMenuOpen(false)}>Our story</a><a href="#promise" onClick={() => setMenuOpen(false)}>Our promise</a><a href="#reviews" onClick={() => setMenuOpen(false)}>Reviews</a></nav>
+        <div className="header-actions"><button className="icon-button search-trigger" aria-label={searchOpen ? 'Close search' : 'Search products'} aria-expanded={searchOpen} aria-controls="freshfarm-search-bar" onClick={() => setSearchOpen(!searchOpen)}><Search size={20} /></button><Link className="account-link" href={signedInUser ? '/dashboard' : '/login'}>{signedInUser ? `My dashboard` : 'Sign in'}</Link><button className="bag-button" onClick={() => { setCartOpen(true); setPlacedOrder(null); setCheckoutOpen(false) }} aria-label={`Bag ${formatQuantity(count)} item${count === 1 ? '' : 's'}`}><ShoppingBag size={18} /><span>Bag</span>{' '}<b>{formatQuantity(count)}</b></button></div>
       </header>
-      {searchOpen && <div className="search-bar"><Search size={18} /><input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search chicken and fresh fish…" aria-label="Search chicken and fresh fish products" /><button onClick={() => { setSearch(''); setSearchOpen(false) }} aria-label="Close search"><X size={18} /></button></div>}
+      {searchOpen && <div id="freshfarm-search-bar" className="search-bar"><Search size={18} /><input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search chicken and fresh fish…" aria-label="Search chicken and fresh fish products" /><button onClick={() => { setSearch(''); setSearchOpen(false) }} aria-label="Close search"><X size={18} /></button></div>}
       <section id="home" className="hero">
         <div className="hero-backdrop"></div>
         <div className="hero-copy">
@@ -236,7 +263,30 @@ export default function FreshFarmStorefront() {
       </section>
       <section className="trust-strip" aria-label="Our standards"><div><span className="trust-icon"><Leaf size={18} /></span><span><b>Responsibly raised</b><small>Better lives, better food</small></span></div><div><span className="trust-icon"><Clock3 size={18} /></span><span><b>Prepared fresh daily</b><small>Never frozen, always fresh</small></span></div><div><span className="trust-icon"><Truck size={20} /></span><span><b>At your door by noon</b><small>Freshness, delivered</small></span></div><div><span className="trust-icon"><ShieldCheck size={19} /></span><span><b>Quality you can trust</b><small>Every cut, carefully checked</small></span></div></section>
 
-      <section id="shop" className="shop-section" data-reveal>
+      <section className="shop-chooser" data-reveal aria-label="Choose a shopping section">
+        <a href="#shop" className="shop-chooser-card is-chicken">
+          <Image src="https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&w=1100&q=85" alt="Fresh chicken cuts prepared at the farm counter" fill sizes="(max-width: 760px) 100vw, 48vw" />
+          <span className="shop-chooser-shade" />
+          <span className="shop-chooser-copy">
+            <span className="eyebrow"><span className="eyebrow-line"></span> SHOP ONE</span>
+            <strong>Chicken / hen products</strong>
+            <em>Whole birds, cuts, live hens and snacks — the farm counter you already know.</em>
+            <span className="shop-chooser-cta">Enter the chicken shop <ArrowRight size={15} /></span>
+          </span>
+        </a>
+        <a href="#fish" className="shop-chooser-card is-fish">
+          <Image src="/fish/fresh-pomfret.jpg" alt="Fresh whole pomfret from the fish counter" fill sizes="(max-width: 760px) 100vw, 48vw" />
+          <span className="shop-chooser-shade" />
+          <span className="shop-chooser-copy">
+            <span className="eyebrow"><span className="eyebrow-line"></span> SHOP TWO</span>
+            <strong>Fresh fish products</strong>
+            <em>Live and fresh catch only — cleaned to order, never cooked or prepared dishes.</em>
+            <span className="shop-chooser-cta">Enter the fish counter <ArrowRight size={15} /></span>
+          </span>
+        </a>
+      </section>
+
+      <section id="shop" className="shop-section" data-reveal tabIndex={-1}>
         <div className="section-heading">
           <div><div className="eyebrow dark-eyebrow"><span className="eyebrow-line"></span> STRAIGHT FROM THE FARM</div><h2>Chicken, <em>raised right.</em></h2></div>
           <a className="view-all" href="#fish">Prefer fish? Visit the fish counter <ArrowRight size={16} /></a>
@@ -258,7 +308,7 @@ export default function FreshFarmStorefront() {
         <div className="fish-inner">
           <div className="section-heading fish-heading">
             <div><div className="eyebrow fish-eyebrow"><span className="eyebrow-line"></span> FRESH FROM THE WATER</div><h2>Today&apos;s catch, <em>on ice.</em></h2></div>
-            <a className="view-all fish-view-all" href="#fish">Browse the fish counter <ArrowRight size={16} /></a>
+            <a className="view-all fish-view-all" href="#shop">Prefer chicken? Visit the chicken shop <ArrowRight size={16} /></a>
           </div>
           <div className="fish-standards" aria-label="Fish counter standards">
             <div><Droplets size={17} /><span><b>Never frozen</b><small>Fresh catch, packed on ice</small></span></div>
@@ -284,7 +334,7 @@ export default function FreshFarmStorefront() {
       <section className="newsletter"><div><div className="eyebrow"><span className="eyebrow-line"></span> A GOOD THING IN YOUR INBOX</div><h2>Fresh news. <em>No fuss.</em></h2><p>Seasonal picks, farm stories, and a little something for your next order.</p></div><form onSubmit={subscribe}><label className="sr-only" htmlFor="newsletter-email">Email address</label><input id="newsletter-email" name="newsletter-email" required type="email" placeholder="Your email address" /><button type="submit">Count me in <ArrowRight size={16} /></button>{newsletterStatus && <small role="status">{newsletterStatus}</small>}<small>By subscribing, you agree to receive the occasional note from us.</small></form></section>
       <footer className="site-footer"><div className="footer-main"><a className="brand footer-brand" href="#home"><span className="brand-mark"><Leaf size={21} /></span><span>fresh<span className="brand-light">farm</span><small>GOOD FOOD, GROWN WITH CARE</small></span></a><p>Fresh chicken, fresh fish.<br />Fair prices. Delivered daily.</p><div className="footer-location"><MapPin size={17} /><span>Serving our neighbourhood<br /><small>Monday – Saturday · 7 am – 7 pm</small></span></div><div className="footer-links"><a href="#shop">Fresh chicken</a><a href="#fish">Fresh fish</a><a href="#story">Our story</a><Link href="/dashboard">My dashboard</Link><Link href="/account">Track guest order</Link><Link href="/admin/login">Farmhouse</Link></div></div><div className="footer-bottom"><span>© 2025 Fresh Farm. Made with care.</span><span>Fresh Chicken. Fresh Fish. Fair Prices.</span><a href="#home">Back to top ↑</a></div></footer>
 
-      {cartOpen && <div className="drawer-backdrop" onClick={() => setCartOpen(false)}><aside className="cart-drawer" onClick={e => e.stopPropagation()} aria-label="Shopping bag"><div className="drawer-heading"><div><span className="eyebrow dark-eyebrow">YOUR FARM BAG</span><h2>{placedOrder ? 'Order received.' : checkoutOpen ? 'Almost there.' : 'The good stuff.'}</h2></div><button aria-label="Close bag" className="icon-button" onClick={() => { setCartOpen(false); setCheckoutOpen(false) }}><X size={20} /></button></div>{placedOrder ? <div className="order-success"><span className="success-icon"><Check size={24} /></span><h3>Thanks for choosing fresh.</h3><p>Order <b>{placedOrder.orderNumber}</b> is saved{placedOrder.paymentStatus === 'paid' ? ' and your payment is confirmed' : ''}. We&apos;ll confirm availability and final weight with you shortly.</p><button className="button button-green" onClick={() => { setCart({}); setCartOpen(false); setPlacedOrder(null); setCheckoutOpen(false) }}>Back to shopping <ArrowRight size={16} /></button></div> : checkoutOpen ? <CheckoutForm items={Object.entries(cart).filter(([id]) => products.some(item => item.id === Number(id))).map(([id, quantity]) => { const p = products.find(item => item.id === Number(id))!; return { productId: p.id, name: p.name, price: p.price, quantity, unit: p.unit, lineTotal: p.price * quantity } })} subtotal={total} token={authToken || undefined} initialCustomer={{ fullName: signedInUser?.displayName || '', email: signedInUser?.email || '', phone: '' }} onBack={() => setCheckoutOpen(false)} onPlaced={order => { setPlacedOrder(order); setCart({}); setCheckoutOpen(false); void loadProducts() }} /> : count === 0 ? <div className="empty-cart"><ShoppingBag size={34} /><h3>Your bag is waiting.</h3><p>Good things are grown fresh and caught fresh every morning.</p><button className="button button-green" onClick={() => setCartOpen(false)}>Explore the shop <ArrowRight size={16} /></button></div> : <><div className="cart-items">{Object.entries(cart).filter(([id]) => products.some(item => item.id === Number(id))).map(([id, quantity]) => { const p = products.find(item => item.id === Number(id))!; const atLimit = p.availableQuantity !== null && quantity >= p.availableQuantity; return <div className="cart-item" key={id}><div className="cart-thumb"><Image src={p.image} alt="" fill sizes="84px" /></div><div className="cart-item-info"><span className={`cart-section-chip is-${p.section}`}>{sectionLabels[p.section]}</span><h3>{p.name}</h3><p>₹{p.price} {p.unit}</p><div className="quantity-control"><button onClick={() => remove(p.id)} aria-label={`Remove one ${p.name}`}><Minus size={13} /></button><span>{formatQuantity(quantity)}</span><button onClick={() => add(p.id)} disabled={atLimit} aria-label={`Add one ${p.name}`} title={atLimit ? 'No more stock available today' : undefined}><Plus size={13} /></button></div></div><b>₹{p.price * quantity}</b></div> })}</div><div className="cart-summary"><div><span>Estimated subtotal</span><b>₹{total.toLocaleString('en-IN')}</b></div><p><Check size={14} /> Final total is confirmed after your order is weighed.</p><button className="button button-green checkout-button" onClick={async () => { setCheckoutOpen(true); setPlacedOrder(null); if (signedInUser) { try { setAuthToken(await signedInUser.getIdToken()) } catch { /* guest checkout still works */ } } }}>Continue to checkout <ArrowRight size={16} /></button><small>Secure online payment or cash on delivery · Home delivery or shop pickup</small></div></>}</aside></div>}
+      {cartOpen && <div className="drawer-backdrop" onClick={() => setCartOpen(false)}><aside ref={cartDrawerRef} className="cart-drawer" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Shopping bag"><div className="drawer-heading"><div><span className="eyebrow dark-eyebrow">YOUR FARM BAG</span><h2>{placedOrder ? 'Order received.' : checkoutOpen ? 'Almost there.' : 'The good stuff.'}</h2></div><button ref={closeBagRef} aria-label="Close bag" className="icon-button" onClick={() => { setCartOpen(false); setCheckoutOpen(false) }}><X size={20} /></button></div>{placedOrder ? <div className="order-success"><span className="success-icon"><Check size={24} /></span><h3>Thanks for choosing fresh.</h3><p>Order <b>{placedOrder.orderNumber}</b> is saved{placedOrder.paymentStatus === 'paid' ? ' and your payment is confirmed' : ''}. We&apos;ll confirm availability and final weight with you shortly.</p><button className="button button-green" onClick={() => { setCart({}); setCartOpen(false); setPlacedOrder(null); setCheckoutOpen(false) }}>Back to shopping <ArrowRight size={16} /></button></div> : checkoutOpen ? <CheckoutForm items={Object.entries(cart).filter(([id]) => products.some(item => item.id === Number(id))).map(([id, quantity]) => { const p = products.find(item => item.id === Number(id))!; return { productId: p.id, name: p.name, price: p.price, quantity, unit: p.unit, lineTotal: p.price * quantity } })} subtotal={total} token={authToken || undefined} initialCustomer={{ fullName: signedInUser?.displayName || '', email: signedInUser?.email || '', phone: '' }} onBack={() => setCheckoutOpen(false)} onPlaced={order => { setPlacedOrder(order); setCart({}); setCheckoutOpen(false); void loadProducts() }} /> : count === 0 ? <div className="empty-cart"><ShoppingBag size={34} /><h3>Your bag is waiting.</h3><p>Good things are grown fresh and caught fresh every morning.</p><button className="button button-green" onClick={() => setCartOpen(false)}>Explore the shop <ArrowRight size={16} /></button></div> : <><div className="cart-items">{Object.entries(cart).filter(([id]) => products.some(item => item.id === Number(id))).map(([id, quantity]) => { const p = products.find(item => item.id === Number(id))!; const atLimit = p.availableQuantity !== null && quantity >= p.availableQuantity; return <div className="cart-item" key={id}><div className="cart-thumb"><Image src={p.image} alt="" fill sizes="84px" /></div><div className="cart-item-info"><span className={`cart-section-chip is-${p.section}`}>{sectionLabels[p.section]}</span><h3>{p.name}</h3><p>₹{p.price} {p.unit}</p><div className="quantity-control"><button onClick={() => remove(p.id)} aria-label={`Remove one ${p.name}`}><Minus size={13} /></button><span>{formatQuantity(quantity)}</span><button onClick={() => add(p.id)} disabled={atLimit} aria-label={`Add one ${p.name}`} title={atLimit ? 'No more stock available today' : undefined}><Plus size={13} /></button></div></div><b>₹{p.price * quantity}</b></div> })}</div><div className="cart-summary"><div><span>Estimated subtotal</span><b>₹{total.toLocaleString('en-IN')}</b></div><p><Check size={14} /> Final total is confirmed after your order is weighed.</p><button className="button button-green checkout-button" onClick={async () => { setCheckoutOpen(true); setPlacedOrder(null); if (signedInUser) { try { setAuthToken(await signedInUser.getIdToken()) } catch { /* guest checkout still works */ } } }}>Continue to checkout <ArrowRight size={16} /></button><small>Secure online payment or cash on delivery · Home delivery or shop pickup</small></div></>}</aside></div>}
     </main>
   )
 }

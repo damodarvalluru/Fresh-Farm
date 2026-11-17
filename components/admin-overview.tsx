@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { CalendarDays, Download, IndianRupee, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react'
 import {
   adminCompact, adminFetch, adminMoney, adminWhen, buildQuery, type Analytics,
@@ -38,18 +38,22 @@ export default function AdminOverview({ onNotify, onUnauthorized }: {
   const [data, setData] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const requestRef = useRef(0)
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current
     setLoading(true)
     setError('')
     try {
-      setData(await adminFetch<Analytics>(`/admin/analytics${buildQuery({ range, from: applied.from, to: applied.to })}`))
+      const next = await adminFetch<Analytics>(`/admin/analytics${buildQuery({ range, from: applied.from, to: applied.to })}`)
+      if (requestId === requestRef.current) setData(next)
     } catch (loadError) {
+      if (requestId !== requestRef.current) return
       const typed = loadError as Error & { status?: number }
       if (typed.status === 401 || typed.status === 403) return onUnauthorized()
       setError(typed.message)
     } finally {
-      setLoading(false)
+      if (requestId === requestRef.current) setLoading(false)
     }
   }, [range, applied, onUnauthorized])
 
@@ -205,6 +209,10 @@ export default function AdminOverview({ onNotify, onUnauthorized }: {
         <section className="admin-card">
           <header className="admin-card-head"><div><span className="admin-eyebrow">SERVICE</span><h3>Fulfilment mix</h3></div></header>
           <BarList rows={data.breakdown.fulfilment.map(row => ({ label: row.type, value: row.count, meta: `${row.count} orders`, color: '#879b78' }))} />
+          {data.breakdown.section?.length > 0 && <>
+            <h4 className="admin-subhead">Chicken vs fish</h4>
+            <BarList rows={data.breakdown.section.map(row => ({ label: row.section === 'fish' ? 'Fresh fish' : 'Chicken / hen', value: row.revenue, meta: `${row.quantity} sold · ${adminMoney(row.revenue)}`, color: row.section === 'fish' ? '#2f7a72' : '#5d7a58' }))} />
+          </>}
           {data.expensesByCategory.length > 0 && <>
             <h4 className="admin-subhead">Expenses by category</h4>
             <BarList rows={data.expensesByCategory.map(row => ({ label: row.category, value: row.total, meta: adminMoney(row.total), color: '#b76a54' }))} />

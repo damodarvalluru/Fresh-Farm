@@ -237,8 +237,8 @@ export default function CheckoutForm({
       </div>
 
       <div className="checkout-section">
-        <span className="checkout-label">Notes for the butcher (optional)</span>
-        <label className="checkout-field"><textarea value={form.notes} onChange={update('notes')} rows={2} maxLength={1000} placeholder="Curry cut, skin off, delivery after 5 pm…"/></label>
+        <span className="checkout-label">Preparation notes (optional)</span>
+        <label className="checkout-field"><textarea value={form.notes} onChange={update('notes')} rows={2} maxLength={1000} placeholder="Cut preferences, cleaning requests, delivery time…"/></label>
       </div>
 
       <div className="cart-summary">

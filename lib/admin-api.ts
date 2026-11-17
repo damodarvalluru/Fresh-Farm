@@ -230,6 +230,7 @@ export type Analytics = {
     status: Array<{ status: string; count: number; total: number }>
     paymentMethod: Array<{ method: string; count: number; total: number }>
     fulfilment: Array<{ type: string; count: number }>
+    section: Array<{ section: 'chicken' | 'fish' | string; revenue: number; quantity: number }>
   }
   products: Array<{ name: string; quantity: number; revenue: number; cost: number; profit: number }>
   agents: Array<{ id: number; name: string; deliveries: number; revenue: number; averageMinutes: number | null }>

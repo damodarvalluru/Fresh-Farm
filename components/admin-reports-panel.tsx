@@ -48,7 +48,7 @@ export default function AdminReportsPanel() {
       <article className="admin-report-card">
         <span className="admin-report-icon"><ShoppingBag size={21} /></span>
         <h3>Orders report</h3>
-        <p>Every order with its placed time, status, fulfilment, payment method and state, totals, customer contact, city and assigned rider — filtered by the dates and status above.</p>
+        <p>Every order with its placed time, status, fulfilment, payment method and state, totals, customer contact, city, assigned rider, product sections (chicken/fish/mixed) and item quantities — filtered by the dates and status above.</p>
         <a className="admin-btn" href={`/api/backend/admin/reports/orders.csv${buildQuery({ from, to, status })}`} download><Download size={14} /> Download orders CSV</a>
       </article>
 

@@ -34,14 +34,24 @@ INSERT INTO product_images (product_id, image_url, alt_text, sort_order) VALUES
 ((SELECT id FROM products WHERE slug='chicken-drumsticks'), 'https://images.unsplash.com/photo-1527477396000-e27163b481c2?auto=format&fit=crop&w=900&q=85', 'Chicken drumsticks', 1),
 ((SELECT id FROM products WHERE slug='live-country-hen'), 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?auto=format&fit=crop&w=900&q=85', 'Live country hen', 1),
 ((SELECT id FROM products WHERE slug='fresh-chicken-wings'), 'https://images.unsplash.com/photo-1608039829572-78524f79c4c7?auto=format&fit=crop&w=900&q=85', 'Fresh chicken wings', 1),
-((SELECT id FROM products WHERE slug='live-rohu'), '/fish/live-rohu.svg', 'Illustration of a live rohu fish', 1),
-((SELECT id FROM products WHERE slug='live-katla'), '/fish/live-katla.svg', 'Illustration of a live katla fish', 1),
-((SELECT id FROM products WHERE slug='fresh-pomfret'), '/fish/fresh-pomfret.svg', 'Illustration of a fresh whole pomfret', 1),
-((SELECT id FROM products WHERE slug='fresh-mackerel'), '/fish/fresh-mackerel.svg', 'Illustration of a fresh whole mackerel', 1),
-((SELECT id FROM products WHERE slug='tilapia-fillets'), '/fish/tilapia-fillets.svg', 'Illustration of fresh tilapia fillets', 1),
-((SELECT id FROM products WHERE slug='basa-fillets'), '/fish/basa-fillets.svg', 'Illustration of fresh basa fillets', 1),
-((SELECT id FROM products WHERE slug='seer-fish-steaks'), '/fish/seer-fish-steaks.svg', 'Illustration of fresh seer fish steaks', 1)
+((SELECT id FROM products WHERE slug='live-rohu'), '/fish/live-rohu.jpg', 'Live rohu (Labeo rohita)', 1),
+((SELECT id FROM products WHERE slug='live-katla'), '/fish/live-katla.jpg', 'Live katla, a freshwater carp', 1),
+((SELECT id FROM products WHERE slug='fresh-pomfret'), '/fish/fresh-pomfret.jpg', 'Fresh whole silver pomfret', 1),
+((SELECT id FROM products WHERE slug='fresh-mackerel'), '/fish/fresh-mackerel.jpg', 'Fresh Atlantic mackerel', 1),
+((SELECT id FROM products WHERE slug='tilapia-fillets'), '/fish/tilapia-fillets.jpg', 'Raw tilapia fillets, never frozen', 1),
+((SELECT id FROM products WHERE slug='basa-fillets'), '/fish/basa-fillets.jpg', 'Fresh boneless basa fillets', 1),
+((SELECT id FROM products WHERE slug='seer-fish-steaks'), '/fish/seer-fish-steaks.jpg', 'Fresh seer fish (Scomberomorus commerson)', 1)
 ON DUPLICATE KEY UPDATE image_url=VALUES(image_url), alt_text=VALUES(alt_text);
+
+-- Existing shops may already have SVG placeholders. Re-running the seed
+-- updates those rows to real photographs without creating extra images.
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/live-rohu.jpg', pi.alt_text = 'Live rohu (Labeo rohita)' WHERE p.slug = 'live-rohu';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/live-katla.jpg', pi.alt_text = 'Live katla, a freshwater carp' WHERE p.slug = 'live-katla';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/fresh-pomfret.jpg', pi.alt_text = 'Fresh whole silver pomfret' WHERE p.slug = 'fresh-pomfret';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/fresh-mackerel.jpg', pi.alt_text = 'Fresh Atlantic mackerel' WHERE p.slug = 'fresh-mackerel';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/tilapia-fillets.jpg', pi.alt_text = 'Raw tilapia fillets, never frozen' WHERE p.slug = 'tilapia-fillets';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/basa-fillets.jpg', pi.alt_text = 'Fresh boneless basa fillets' WHERE p.slug = 'basa-fillets';
+UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = '/fish/seer-fish-steaks.jpg', pi.alt_text = 'Fresh seer fish (Scomberomorus commerson)' WHERE p.slug = 'seer-fish-steaks';
 
 -- Stock rows are only created when missing; re-running the seed never resets
 -- quantities that the shop has already been selling down.

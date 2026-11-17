@@ -149,6 +149,25 @@ async function main() {
   // --- Payment reporting indexes ------------------------------------------
   await addIndex('payments', 'idx_payments_status_date', '(status, created_at)')
 
+  // --- Fish catalogue photographs (replace SVG placeholders) --------------
+  // Real, species-accurate photos stored at public/fish/ (see CREDITS.md).
+  const fishPhotos = [
+    ['live-rohu', '/fish/live-rohu.jpg', 'Live rohu (Labeo rohita)'],
+    ['live-katla', '/fish/live-katla.jpg', 'Live katla, a freshwater carp'],
+    ['fresh-pomfret', '/fish/fresh-pomfret.jpg', 'Fresh whole silver pomfret'],
+    ['fresh-mackerel', '/fish/fresh-mackerel.jpg', 'Fresh Atlantic mackerel'],
+    ['tilapia-fillets', '/fish/tilapia-fillets.jpg', 'Raw tilapia fillets, never frozen'],
+    ['basa-fillets', '/fish/basa-fillets.jpg', 'Fresh boneless basa fillets'],
+    ['seer-fish-steaks', '/fish/seer-fish-steaks.jpg', 'Fresh seer fish (Scomberomorus commerson)'],
+  ]
+  for (const [slug, imageUrl, altText] of fishPhotos) {
+    const [result] = await db.execute(
+      'UPDATE product_images pi JOIN products p ON p.id = pi.product_id SET pi.image_url = ?, pi.alt_text = ? WHERE p.slug = ?',
+      [imageUrl, altText, slug],
+    )
+    if (result.affectedRows) console.info(`Updated photograph for ${slug}`)
+  }
+
   console.info('Migration complete.')
 }
 

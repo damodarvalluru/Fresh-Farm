@@ -168,7 +168,9 @@ async function totalsFor(fromTimestamp, toExclusive) {
             SUM(status = 'cancelled') AS cancelled,
             SUM(status = 'delivered') AS delivered,
             SUM(CASE WHEN status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS revenue,
-            SUM(CASE WHEN payment_status = 'paid' AND status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS collected
+            SUM(CASE WHEN payment_status = 'paid' AND status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS collected,
+            SUM(CASE WHEN payment_status <> 'paid' AND status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS outstanding,
+            SUM(CASE WHEN status <> 'cancelled' THEN discount_amount ELSE 0 END) AS customer_savings
      FROM orders WHERE created_at >= ? AND created_at < ?`,
     [fromTimestamp, toExclusive],
   )
@@ -182,17 +184,27 @@ async function totalsFor(fromTimestamp, toExclusive) {
     'SELECT SUM(amount) AS total FROM operating_expenses WHERE expense_date >= ? AND expense_date < ?',
     [fromTimestamp.slice(0, 10), toExclusive.slice(0, 10)],
   )
+  const [deliveryExpenses] = await db.query(
+    "SELECT SUM(amount) AS total FROM operating_expenses WHERE category = 'delivery' AND expense_date >= ? AND expense_date < ?",
+    [fromTimestamp.slice(0, 10), toExclusive.slice(0, 10)],
+  )
   const revenue = round2(orders[0]?.revenue || 0)
   const cogsTotal = round2(cogs[0]?.cogs || 0)
   const expenseTotal = round2(expenses[0]?.total || 0)
+  const deliveryCosts = round2(deliveryExpenses[0]?.total || 0)
   return {
     orders: Number(orders[0]?.orders || 0),
     cancelled: Number(orders[0]?.cancelled || 0),
     delivered: Number(orders[0]?.delivered || 0),
     revenue,
     collected: round2(orders[0]?.collected || 0),
+    outstanding: round2(orders[0]?.outstanding || 0),
+    customerSavings: round2(orders[0]?.customer_savings || 0),
     cogs: cogsTotal,
     expenses: expenseTotal,
+    deliveryCosts,
+    operatingCosts: round2(expenseTotal - deliveryCosts),
+    grossProfit: round2(revenue - cogsTotal),
     netProfit: round2(revenue - cogsTotal - expenseTotal),
   }
 }
@@ -322,92 +334,98 @@ router.get('/analytics', async (req, res, next) => {
       }
     })
 
-    const totals = series.reduce((acc, bucket) => {
-      acc.orders += bucket.orders
-      acc.delivered += bucket.delivered
-      acc.cancelled += bucket.cancelled
-      acc.revenue = round2(acc.revenue + bucket.revenue)
-      acc.collected = round2(acc.collected + bucket.collected)
-      acc.outstanding = round2(acc.outstanding + bucket.outstanding)
-      acc.cogs = round2(acc.cogs + bucket.cogs)
-      acc.expenses = round2(acc.expenses + bucket.expenses)
-      acc.deliveryCosts = round2(acc.deliveryCosts + bucket.deliveryCosts)
-      acc.operatingCosts = round2(acc.operatingCosts + bucket.operatingCosts)
-      acc.grossProfit = round2(acc.grossProfit + bucket.grossProfit)
-      acc.netProfit = round2(acc.netProfit + bucket.netProfit)
-      acc.customerSavings = round2(acc.customerSavings + bucket.customerSavings)
-      return acc
-    }, {
-      orders: 0, delivered: 0, cancelled: 0, revenue: 0, collected: 0, outstanding: 0,
-      cogs: 0, expenses: 0, deliveryCosts: 0, operatingCosts: 0,
-      grossProfit: 0, netProfit: 0, customerSavings: 0,
-    })
+    // KPI totals must cover the entire requested window. The chart series is
+    // capped at MAX_BUCKETS for rendering, so reducing it would undercount
+    // long custom ranges. Use full-window SQL aggregates instead.
+    const totals = await totalsFor(window.fromTimestamp, window.toExclusive)
     totals.averageOrderValue = totals.orders ? round2(totals.revenue / totals.orders) : 0
     totals.profitMargin = totals.revenue ? Math.round((totals.netProfit / totals.revenue) * 1000) / 10 : 0
 
-    const [previous, previousOrders] = await Promise.all([
-      totalsFor(window.previousFromTimestamp, window.previousToExclusive),
+    const [
+      [previous, previousOrders],
+      [statusBreakdown],
+      [paymentBreakdown],
+      [fulfilmentBreakdown],
+      [products],
+      [sectionBreakdown],
+      [agents],
+      [delivery],
+      [customers],
+      [active],
+    ] = await Promise.all([
+      Promise.all([
+        totalsFor(window.previousFromTimestamp, window.previousToExclusive),
+        db.query(
+          `SELECT COUNT(*) AS orders, SUM(CASE WHEN status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS revenue
+           FROM orders WHERE created_at >= ? AND created_at < ?`,
+          [window.previousFromTimestamp, window.previousToExclusive],
+        ).then(([rows]) => rows[0]),
+      ]),
       db.query(
-        `SELECT COUNT(*) AS orders, SUM(CASE WHEN status <> 'cancelled' THEN COALESCE(total_final, total_estimated) ELSE 0 END) AS revenue
-         FROM orders WHERE created_at >= ? AND created_at < ?`,
-        [window.previousFromTimestamp, window.previousToExclusive],
-      ).then(([rows]) => rows[0]),
+        `SELECT status, COUNT(*) AS count, SUM(COALESCE(total_final, total_estimated)) AS total
+         FROM orders WHERE created_at >= ? AND created_at < ?
+         GROUP BY status ORDER BY count DESC`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT payment_method AS method, COUNT(*) AS count, SUM(COALESCE(total_final, total_estimated)) AS total
+         FROM orders WHERE created_at >= ? AND created_at < ? AND status <> 'cancelled'
+         GROUP BY payment_method ORDER BY count DESC`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT fulfilment AS type, COUNT(*) AS count FROM orders
+         WHERE created_at >= ? AND created_at < ? GROUP BY fulfilment`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT i.product_name_snapshot AS name,
+                SUM(COALESCE(i.actual_quantity, i.requested_quantity)) AS quantity,
+                SUM(COALESCE(i.final_line_total, i.estimated_line_total)) AS revenue,
+                SUM(i.cost_snapshot * COALESCE(i.actual_quantity, i.requested_quantity)) AS cost
+         FROM order_items i JOIN orders o ON o.id = i.order_id
+         WHERE o.status <> 'cancelled' AND o.created_at >= ? AND o.created_at < ?
+         GROUP BY i.product_name_snapshot
+         ORDER BY revenue DESC LIMIT 8`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT COALESCE(c.section, 'chicken') AS section,
+                SUM(COALESCE(i.final_line_total, i.estimated_line_total)) AS revenue,
+                SUM(COALESCE(i.actual_quantity, i.requested_quantity)) AS quantity
+         FROM order_items i
+         JOIN orders o ON o.id = i.order_id
+         LEFT JOIN products p ON p.id = i.product_id
+         LEFT JOIN categories c ON c.id = p.category_id
+         WHERE o.status <> 'cancelled' AND o.created_at >= ? AND o.created_at < ?
+         GROUP BY COALESCE(c.section, 'chicken')
+         ORDER BY revenue DESC`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT da.id, da.name, COUNT(*) AS deliveries,
+                SUM(COALESCE(o.total_final, o.total_estimated)) AS revenue,
+                AVG(TIMESTAMPDIFF(MINUTE, o.assigned_at, o.delivered_at)) AS average_minutes
+         FROM orders o JOIN delivery_agents da ON da.id = o.delivery_agent_id
+         WHERE o.status = 'delivered' AND o.assigned_at IS NOT NULL AND o.delivered_at IS NOT NULL
+           AND o.created_at >= ? AND o.created_at < ?
+         GROUP BY da.id, da.name ORDER BY deliveries DESC LIMIT 8`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT COUNT(*) AS delivered_with_agent,
+                AVG(TIMESTAMPDIFF(MINUTE, assigned_at, delivered_at)) AS average_minutes
+         FROM orders WHERE status = 'delivered' AND assigned_at IS NOT NULL AND delivered_at IS NOT NULL
+           AND created_at >= ? AND created_at < ?`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query(
+        `SELECT SUM(created_at >= ? AND created_at < ?) AS new_customers, COUNT(*) AS total_customers
+         FROM users WHERE is_active = 1`,
+        [window.fromTimestamp, window.toExclusive],
+      ),
+      db.query('SELECT COUNT(*) AS active_orders FROM orders WHERE status IN (?)', [ACTIVE_STATUSES]),
     ])
-
-    const [statusBreakdown] = await db.query(
-      `SELECT status, COUNT(*) AS count, SUM(COALESCE(total_final, total_estimated)) AS total
-       FROM orders WHERE created_at >= ? AND created_at < ?
-       GROUP BY status ORDER BY count DESC`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-    const [paymentBreakdown] = await db.query(
-      `SELECT payment_method AS method, COUNT(*) AS count, SUM(COALESCE(total_final, total_estimated)) AS total
-       FROM orders WHERE created_at >= ? AND created_at < ? AND status <> 'cancelled'
-       GROUP BY payment_method ORDER BY count DESC`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-    const [fulfilmentBreakdown] = await db.query(
-      `SELECT fulfilment AS type, COUNT(*) AS count FROM orders
-       WHERE created_at >= ? AND created_at < ? GROUP BY fulfilment`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-
-    const [products] = await db.query(
-      `SELECT i.product_name_snapshot AS name,
-              SUM(COALESCE(i.actual_quantity, i.requested_quantity)) AS quantity,
-              SUM(COALESCE(i.final_line_total, i.estimated_line_total)) AS revenue,
-              SUM(i.cost_snapshot * COALESCE(i.actual_quantity, i.requested_quantity)) AS cost
-       FROM order_items i JOIN orders o ON o.id = i.order_id
-       WHERE o.status <> 'cancelled' AND o.created_at >= ? AND o.created_at < ?
-       GROUP BY i.product_name_snapshot
-       ORDER BY revenue DESC LIMIT 8`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-
-    const [agents] = await db.query(
-      `SELECT da.id, da.name, COUNT(*) AS deliveries,
-              SUM(COALESCE(o.total_final, o.total_estimated)) AS revenue,
-              AVG(TIMESTAMPDIFF(MINUTE, o.assigned_at, o.delivered_at)) AS average_minutes
-       FROM orders o JOIN delivery_agents da ON da.id = o.delivery_agent_id
-       WHERE o.status = 'delivered' AND o.assigned_at IS NOT NULL AND o.delivered_at IS NOT NULL
-         AND o.created_at >= ? AND o.created_at < ?
-       GROUP BY da.id, da.name ORDER BY deliveries DESC LIMIT 8`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-
-    const [delivery] = await db.query(
-      `SELECT COUNT(*) AS delivered_with_agent,
-              AVG(TIMESTAMPDIFF(MINUTE, assigned_at, delivered_at)) AS average_minutes
-       FROM orders WHERE status = 'delivered' AND assigned_at IS NOT NULL AND delivered_at IS NOT NULL
-         AND created_at >= ? AND created_at < ?`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-    const [customers] = await db.query(
-      `SELECT SUM(created_at >= ? AND created_at < ?) AS new_customers, COUNT(*) AS total_customers
-       FROM users WHERE is_active = 1`,
-      [window.fromTimestamp, window.toExclusive],
-    )
-    const [active] = await db.query('SELECT COUNT(*) AS active_orders FROM orders WHERE status IN (?)', [ACTIVE_STATUSES])
 
     res.json({
       range: window.range,
@@ -439,6 +457,11 @@ router.get('/analytics', async (req, res, next) => {
         status: statusBreakdown.map(row => ({ status: row.status, count: Number(row.count), total: round2(row.total || 0) })),
         paymentMethod: paymentBreakdown.map(row => ({ method: row.method, count: Number(row.count), total: round2(row.total || 0) })),
         fulfilment: fulfilmentBreakdown.map(row => ({ type: row.type, count: Number(row.count) })),
+        section: sectionBreakdown.map(row => ({
+          section: row.section === 'fish' ? 'fish' : 'chicken',
+          revenue: round2(row.revenue || 0),
+          quantity: Number(row.quantity || 0),
+        })),
       },
       products: products.map(row => ({
         name: row.name,
@@ -492,7 +515,12 @@ router.get('/reports/orders.csv', async (req, res, next) => {
     const [rows] = await db.query(
       `SELECT o.order_number, o.created_at, o.status, o.fulfilment, o.payment_method, o.payment_status,
               o.subtotal_estimated, o.delivery_fee, o.discount_amount, o.total_estimated, o.total_final,
-              u.full_name, u.email, u.phone, a.city, a.postal_code, da.name AS agent_name
+              u.full_name, u.email, u.phone, a.city, a.postal_code, da.name AS agent_name,
+              (SELECT GROUP_CONCAT(DISTINCT CASE WHEN c.section = 'fish' THEN 'fish' ELSE 'chicken' END ORDER BY c.section SEPARATOR '+')
+                 FROM order_items i LEFT JOIN products p ON p.id = i.product_id
+                 LEFT JOIN categories c ON c.id = p.category_id WHERE i.order_id = o.id) AS sections,
+              (SELECT GROUP_CONCAT(CONCAT(i.product_name_snapshot, ' x ', COALESCE(i.actual_quantity, i.requested_quantity)) SEPARATOR '; ')
+                 FROM order_items i WHERE i.order_id = o.id) AS items
        FROM orders o
        JOIN users u ON u.id = o.customer_id
        LEFT JOIN addresses a ON a.id = o.address_id
@@ -504,13 +532,14 @@ router.get('/reports/orders.csv', async (req, res, next) => {
     return sendCsv(res, `fresh-farm-orders-${ymd(new Date())}.csv`, [
       'Order number', 'Placed at (UTC)', 'Status', 'Fulfilment', 'Payment method', 'Payment status',
       'Subtotal', 'Delivery fee', 'Discount', 'Total', 'Final total', 'Customer', 'Email', 'Phone',
-      'City', 'Postal code', 'Delivery agent',
+      'City', 'Postal code', 'Delivery agent', 'Sections', 'Items',
     ], rows.map(row => [
       row.order_number, new Date(row.created_at).toISOString(), row.status, row.fulfilment,
       row.payment_method, row.payment_status, Number(row.subtotal_estimated), Number(row.delivery_fee),
       Number(row.discount_amount), Number(row.total_estimated),
       row.total_final === null ? '' : Number(row.total_final), row.full_name, row.email, row.phone,
       row.city || '', row.postal_code || '', row.agent_name || '',
+      row.sections || '', row.items || '',
     ]))
   } catch (error) { next(error) }
 })

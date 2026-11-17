@@ -73,6 +73,7 @@ export default function AdminDashboard({ initialProfile }: { initialProfile: Adm
   const initials = (profile.displayName || profile.fullName || 'A').slice(0, 1).toUpperCase()
 
   return <main className="admin-app">
+    <a className="skip-link" href="#admin-main">Skip to dashboard content</a>
     <aside className="admin-side">
       <Link href="/" className="admin-brand"><span className="brand-mark"><Leaf size={19} /></span><span>fresh<b>farm</b></span><small>FARMHOUSE</small></Link>
 
@@ -94,7 +95,7 @@ export default function AdminDashboard({ initialProfile }: { initialProfile: Adm
       </div>
     </aside>
 
-    <div className="admin-main">
+    <div className="admin-main" id="admin-main" tabIndex={-1}>
       <header className="admin-top">
         <div>
           <span className="admin-eyebrow">{meta.eyebrow}</span>

@@ -209,6 +209,7 @@ export default function CustomerDashboard() {
   const firstName = data?.customer.fullName?.split(' ')[0] || user.displayName?.split(' ')[0] || 'there'
 
   return <main className="dash-page">
+    <a className="skip-link" href="#dash-main">Skip to dashboard content</a>
     <FlowerCelebration active={celebrate} onDone={() => setCelebrate(false)} />
     <aside className="dash-sidebar">
       <Link href="/" className="dash-brand"><span className="brand-mark"><Leaf size={19} /></span><span>fresh<b>farm</b></span></Link>
@@ -227,7 +228,7 @@ export default function CustomerDashboard() {
       </div>
     </aside>
 
-    <section className="dash-main">
+    <section className="dash-main" id="dash-main" tabIndex={-1}>
       <header className="dash-topbar">
         <div>
           <span className="dash-eyebrow">YOUR FRESH FARM ACCOUNT</span>

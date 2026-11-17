@@ -149,7 +149,7 @@ export function TrendChart({ points, series, height = 230, money = true }: {
         const area = `M ${xAt(0)} ${pad.top + chartH} L ${item.values.map((value, index) => `${xAt(index)} ${yAt(value)}`).join(' L ')} L ${xAt(item.values.length - 1)} ${pad.top + chartH} Z`
         return <g key={item.label}>
           {item.area && <path d={area} fill={item.color} opacity="0.12" />}
-          <polyline points={line} fill="none" stroke={item.color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+          <polyline className="chart-line" pathLength={1} points={line} fill="none" stroke={item.color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
           {item.values.map((value, index) => <circle key={index} cx={xAt(index)} cy={yAt(value)} r="3" fill="#fffefa" stroke={item.color} strokeWidth="2">
             <title>{`${item.label} · ${points[index]}: ${money ? adminMoney(value) : value}`}</title>
           </circle>)}
