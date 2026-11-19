@@ -21,7 +21,7 @@ The script creates the user + admin rows, promotes the account to ADMIN, stores 
 
 After a first-time default sign-in, **My profile → Replace temporary credentials** requires the current temporary password and PIN plus a new password (12+ characters) and a new PIN (6–10 digits). Both new hashes are written to the database in one update. From that moment the default credentials are permanently retired: `/api/auth/admin/default-login` refuses to authenticate, and password/PIN-only login uses the database hashes. If `ADMIN_PASSWORD_HASH` is configured, the owner-setup and reset flows remain available as an alternative recovery path.
 
-All login, setup and reset attempts share a rate limit of 5 requests per 15 minutes per client. Failed attempts return a generic error so email existence is not revealed.
+All login, setup and reset attempts share a rate limit of 10 failed requests per 15 minutes per client; successful sign-ins do not consume the budget. Failed attempts return a generic error so email existence is not revealed.
 
 ## Sessions
 

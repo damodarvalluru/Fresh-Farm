@@ -11,7 +11,10 @@ const router = express.Router()
 const production = process.env.NODE_ENV === 'production'
 const cookieName = production ? '__Host-ff-admin' : 'ff-admin'
 const cookieOptions = { httpOnly: true, secure: production, sameSite: 'lax', path: '/', maxAge: 8 * 60 * 60 * 1000 }
-const adminLoginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many sign-in attempts. Try again later.' } })
+// Successful sign-ins do not consume the budget, and a generous limit of 10
+// failed attempts per 15 minutes keeps a temporary outage or typo from
+// locking the owner out while still blocking brute-force attempts.
+const adminLoginLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, skipSuccessfulRequests: true, message: { error: 'Too many sign-in attempts. Try again later.' } })
 const adminSetupLimit = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many setup attempts. Try again later.' } })
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'ORDER_MANAGER']
 const PASSWORD_MIN = 12
