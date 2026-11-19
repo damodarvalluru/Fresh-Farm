@@ -2,6 +2,9 @@
 const apiOrigin = process.env.API_INTERNAL_URL || 'http://localhost:4000'
 
 const nextConfig = {
+  experimental: {
+    agentUpgrade: 'security',
+  },
   images: {
     unoptimized: true,
   },
