@@ -1,6 +1,6 @@
 # Admin security, setup and recovery
 
-The staff area has no default password and no unauthenticated reset endpoint. Passwords and PINs are stored only as Argon2id hashes in the `admins` table. `ADMIN_PASSWORD_HASH` in the environment is optional: keep it as a bootstrap/fallback secret for a brand-new database, or leave it empty once the owner has saved a database password.
+The staff area has one **temporary default password/PIN for first-time login only** and no unauthenticated reset endpoint. Only Argon2id hashes of those defaults are stored, in `server/.env` as `ADMIN_DEFAULT_PASSWORD_HASH` and `ADMIN_DEFAULT_PIN_HASH`; the plaintext values never go into source control, frontend configuration, logs or chat. Personal passwords and PINs are stored only as Argon2id hashes in the `admins` table. `ADMIN_PASSWORD_HASH` in the environment is optional: keep it as a bootstrap/fallback secret for a brand-new database, or leave it empty once the owner has saved a database password.
 
 Provision or rotate the owner from the server folder:
 
@@ -14,11 +14,12 @@ The script creates the user + admin rows, promotes the account to ADMIN, stores 
 
 `/admin/login` offers three paths:
 
+- **First-time (temporary defaults)** — shown only while the account has no password/PIN hash of its own. Requires **both** the temporary password and the 6–10 digit PIN; each is verified against its Argon2id hash on the server. On a brand-new database it also creates the owner row from the submitted email and name. Single-factor password or PIN sign-in is blocked in this state.
 - **Password** — email + password, verified against the database hash (or the bootstrap hash when no database password exists yet).
 - **PIN** — email + a 6–10 digit PIN, for fast sign-in on a trusted device. A PIN never replaces the password: changing it requires the current password.
 - **Google** — staff accounts that already have a Firebase identity can sign in with Google; the server checks that the verified email belongs to an active admin.
 
-On a new owner account with no database password, the screen shows **First-time owner setup**. It accepts the bootstrap password from `ADMIN_PASSWORD_HASH` and lets the owner save a password and PIN to the database.
+After a first-time default sign-in, **My profile → Replace temporary credentials** requires the current temporary password and PIN plus a new password (12+ characters) and a new PIN (6–10 digits). Both new hashes are written to the database in one update. From that moment the default credentials are permanently retired: `/api/auth/admin/default-login` refuses to authenticate, and password/PIN-only login uses the database hashes. If `ADMIN_PASSWORD_HASH` is configured, the owner-setup and reset flows remain available as an alternative recovery path.
 
 All login, setup and reset attempts share a rate limit of 5 requests per 15 minutes per client. Failed attempts return a generic error so email existence is not revealed.
 
@@ -35,7 +36,7 @@ Changing or resetting a password revokes outstanding sessions. Signing out revok
 3. **No bootstrap secret** — run `node scripts/create-admin.js` with the owner email and a new password. It writes the new hash and revokes sessions.
 4. Remove old secrets from the secret manager's active version and confirm the new login.
 
-Never enable a public password reset, create a default credential, or store plaintext passwords, hashes, PINs or session tokens in source control, frontend configuration, logs or chat.
+Never enable a public password reset, extend the temporary default credentials beyond first-time setup, or store plaintext passwords, PINs or session tokens in source control, frontend configuration, logs or chat. Only their salted Argon2id hashes belong in the server environment.
 
 ## Staff profile
 

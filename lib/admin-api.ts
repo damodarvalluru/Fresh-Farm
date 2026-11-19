@@ -15,6 +15,7 @@ export type AdminProfile = {
   lastLoginAt: string | null
   hasPassword: boolean
   hasPin: boolean
+  usingDefaultCredentials: boolean
   memberSince: string
 }
 

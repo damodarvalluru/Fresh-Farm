@@ -19,9 +19,26 @@ const PIN_PATTERN = /^\d{6,10}$/
 
 const GENERIC_LOGIN_ERROR = 'The sign-in details are not correct.'
 const NOT_CONFIGURED = 'Staff password access is not configured yet. Use the owner setup process.'
+const DEFAULT_LOGIN_DISABLED = 'First-time default sign-in is not available on this server.'
+const DEFAULT_CREDENTIALS_RETIRED = 'Temporary default credentials are no longer active. Sign in with your own password or PIN.'
+const FIRST_TIME_LOGIN_REQUIRED = 'Use first-time sign-in with both your password and PIN.'
 
 function text(value, max) {
   return typeof value === 'string' ? value.trim().slice(0, max) : ''
+}
+
+function isArgon2Hash(value) {
+  return typeof value === 'string' && value.startsWith('$argon2id$')
+}
+
+// The temporary defaults live only as Argon2id hashes in the server environment.
+// They are usable only while this account has no password/PIN hash of its own.
+function defaultCredentialsConfigured() {
+  return isArgon2Hash(process.env.ADMIN_DEFAULT_PASSWORD_HASH) && isArgon2Hash(process.env.ADMIN_DEFAULT_PIN_HASH)
+}
+
+function hasStoredCredentials(admin) {
+  return Boolean(admin?.password_hash || admin?.pin_hash)
 }
 
 function validPassword(value) {
@@ -124,7 +141,8 @@ router.get('/admin/setup-status', async (_req, res, next) => {
   try {
     const rows = await staffAccounts()
     const configured = Boolean(process.env.ADMIN_PASSWORD_HASH?.startsWith('$argon2id$'))
-    const hasCredentials = rows.length === 1 && Boolean(rows[0].password_hash || rows[0].pin_hash)
+    const hasCredentials = rows.length === 1 && hasStoredCredentials(rows[0])
+    const usingDefaults = rows.length === 1 && !hasCredentials
     // This endpoint is public so the login screen can decide which form to
     // show. Never expose staff identity here: only non-identifying flags are
     // safe to return before authentication.
@@ -135,6 +153,8 @@ router.get('/admin/setup-status', async (_req, res, next) => {
       hasPassword: Boolean(rows[0]?.password_hash),
       hasPin: Boolean(rows[0]?.pin_hash),
       emailRequired: rows.length !== 1,
+      defaultLoginAvailable: defaultCredentialsConfigured() && (rows.length === 0 || usingDefaults),
+      usingDefaultCredentials: usingDefaults,
     })
   } catch (error) { next(error) }
 })
@@ -174,12 +194,73 @@ router.post('/admin/setup', adminSetupLimit, async (req, res, next) => {
   } catch (error) { next(error) }
 })
 
+// Temporary, first-time-only sign-in. Both the default password and the
+// default PIN must match their Argon2id hashes. Once the admin saves personal
+// credentials this route refuses to authenticate, so the defaults can never
+// be used again as a back door.
+router.post('/admin/default-login', adminLoginLimit, async (req, res, next) => {
+  try {
+    if (!defaultCredentialsConfigured()) return res.status(503).json({ error: DEFAULT_LOGIN_DISABLED })
+    const password = req.body?.password
+    const pin = req.body?.pin
+    if (typeof password !== 'string' || password.length < 1 || password.length > 200 || !validPin(pin)) {
+      return res.status(400).json({ error: 'Enter the temporary password and the 6 to 10 digit PIN.' })
+    }
+
+    let admin = await pickStaff(req.body?.email)
+    if (!admin) {
+      const rows = await staffAccounts()
+      if (rows.length) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+
+      // No staff account yet: create the owner using the details supplied with
+      // the first sign-in. Credential hashes stay NULL until the admin replaces
+      // the temporary defaults from My profile.
+      const email = text(req.body?.email, 254).toLowerCase() || text(process.env.ADMIN_DEFAULT_EMAIL, 254).toLowerCase() || 'owner@freshfarm.local'
+      const fullName = text(req.body?.fullName, 160) || text(process.env.ADMIN_DEFAULT_NAME, 160) || 'Farm Owner'
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || fullName.length < 2) {
+        return res.status(400).json({ error: 'Enter a valid owner email and name to create the first staff account.' })
+      }
+      const [users] = await db.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [email])
+      let userId
+      if (users.length) {
+        userId = users[0].id
+        await db.execute("UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'ADMIN' LIMIT 1), is_active = 1 WHERE id = ?", [userId])
+      } else {
+        const [created] = await db.execute(
+          "INSERT INTO users (firebase_uid, email, full_name, role_id) VALUES (?, ?, ?, (SELECT id FROM roles WHERE name = 'ADMIN' LIMIT 1))",
+          [`local-admin:${email}`, email, fullName],
+        )
+        userId = created.insertId
+      }
+      const [createdAdmin] = await db.execute(
+        "INSERT INTO admins (user_id, role_id, display_name) VALUES (?, (SELECT id FROM roles WHERE name = 'ADMIN' LIMIT 1), ?)",
+        [userId, fullName],
+      )
+      admin = (await staffAccounts()).find(row => row.id === createdAdmin.insertId)
+    }
+    if (!admin) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+    if (hasStoredCredentials(admin)) return res.status(409).json({ error: DEFAULT_CREDENTIALS_RETIRED })
+
+    const [passwordMatches, pinMatches] = await Promise.all([
+      argon2.verify(process.env.ADMIN_DEFAULT_PASSWORD_HASH, password).catch(() => false),
+      argon2.verify(process.env.ADMIN_DEFAULT_PIN_HASH, pin).catch(() => false),
+    ])
+    if (!passwordMatches || !pinMatches) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+
+    const result = await issueSession(res, admin.id, admin.role)
+    return res.json({ ...result, usingDefaultCredentials: true })
+  } catch (error) { next(error) }
+})
+
 router.post('/admin/password-login', adminLoginLimit, async (req, res, next) => {
   try {
     const password = req.body?.password
     if (typeof password !== 'string' || password.length < 1 || password.length > 1024) return res.status(400).json({ error: 'Enter a valid password.' })
     const admin = await pickStaff(req.body?.email)
     if (!admin) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+    // While the temporary defaults are active, a single factor must not grant
+    // access: the first-time form requires the password and PIN together.
+    if (defaultCredentialsConfigured() && !hasStoredCredentials(admin)) return res.status(409).json({ error: FIRST_TIME_LOGIN_REQUIRED })
     if (admin.password_hash) {
       if (!(await argon2.verify(admin.password_hash, password))) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
     } else {
@@ -198,7 +279,10 @@ router.post('/admin/pin-login', adminLoginLimit, async (req, res, next) => {
     const pin = req.body?.pin
     if (typeof pin !== 'string' || !PIN_PATTERN.test(pin)) return res.status(400).json({ error: 'Enter your 6 to 10 digit PIN.' })
     const admin = await pickStaff(req.body?.email)
-    if (!admin?.pin_hash) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+    if (!admin?.pin_hash) {
+      if (defaultCredentialsConfigured() && admin && !hasStoredCredentials(admin)) return res.status(409).json({ error: FIRST_TIME_LOGIN_REQUIRED })
+      return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
+    }
     if (!(await argon2.verify(admin.pin_hash, pin))) return res.status(401).json({ error: GENERIC_LOGIN_ERROR })
     const result = await issueSession(res, admin.id, admin.role)
     return res.json(result)
@@ -227,18 +311,45 @@ router.post('/admin/credentials', requireAdmin, async (req, res, next) => {
     const newPassword = req.body?.newPassword
     const newPin = req.body?.newPin
     if (!newPassword && !newPin) return res.status(400).json({ error: 'Provide a new password or PIN to update.' })
-    if (newPassword && !validPassword(newPassword)) return res.status(400).json({ error: `Choose a password with at least ${PASSWORD_MIN} characters.` })
-    if (newPin && !validPin(newPin)) return res.status(400).json({ error: 'A PIN must be 6 to 10 digits.' })
-    const [rows] = await db.execute('SELECT password_hash FROM admins WHERE id = ? LIMIT 1', [req.admin.id])
+
+    const [rows] = await db.execute('SELECT password_hash, pin_hash FROM admins WHERE id = ? LIMIT 1', [req.admin.id])
     if (!rows.length) return res.status(401).json({ error: 'Your admin account could not be found.' })
-    const currentHash = rows[0].password_hash || process.env.ADMIN_PASSWORD_HASH
-    const current = req.body?.currentPassword
-    if (typeof current !== 'string' || current.length < 1 || current.length > 200) return res.status(400).json({ error: 'Enter your current password to confirm this change.' })
-    if (!currentHash || !(await argon2.verify(currentHash, current))) return res.status(401).json({ error: 'Your current password is not correct.' })
-    await db.execute('UPDATE admins SET password_hash = COALESCE(?, password_hash), pin_hash = COALESCE(?, pin_hash), password_updated_at = UTC_TIMESTAMP() WHERE id = ?', [newPassword ? await hash(newPassword) : null, newPin ? await hash(newPin) : null, req.admin.id])
+    const usingDefaults = !rows[0].password_hash && !rows[0].pin_hash
+
+    if (usingDefaults) {
+      // Finishing first-time setup replaces BOTH temporary credentials at once,
+      // so there is never a half-retired default that still grants access.
+      if (!newPassword || !newPin) return res.status(400).json({ error: 'Replace both the temporary password and PIN to finish setup.' })
+      if (!validPassword(newPassword)) return res.status(400).json({ error: `Choose a password with at least ${PASSWORD_MIN} characters.` })
+      if (!validPin(newPin)) return res.status(400).json({ error: 'A PIN must be 6 to 10 digits.' })
+      const currentPassword = req.body?.currentPassword
+      const currentPin = req.body?.currentPin
+      if (typeof currentPassword !== 'string' || currentPassword.length < 1 || currentPassword.length > 200) return res.status(400).json({ error: 'Enter the temporary password to confirm this change.' })
+      if (!validPin(currentPin)) return res.status(400).json({ error: 'Enter the temporary PIN to confirm this change.' })
+      const passwordHash = process.env.ADMIN_DEFAULT_PASSWORD_HASH
+      const pinHash = process.env.ADMIN_DEFAULT_PIN_HASH
+      const bootstrapHash = process.env.ADMIN_PASSWORD_HASH
+      const [passwordMatches, pinMatches] = await Promise.all([
+        Promise.any([
+          isArgon2Hash(passwordHash) ? argon2.verify(passwordHash, currentPassword) : Promise.reject(new Error('no default')),
+          isArgon2Hash(bootstrapHash) ? argon2.verify(bootstrapHash, currentPassword) : Promise.reject(new Error('no bootstrap')),
+        ]).then(() => true, () => false),
+        isArgon2Hash(pinHash) ? argon2.verify(pinHash, currentPin).catch(() => false) : Promise.resolve(false),
+      ])
+      if (!passwordMatches || !pinMatches) return res.status(401).json({ error: 'The temporary credentials are not correct.' })
+      await db.execute('UPDATE admins SET password_hash = ?, pin_hash = ?, password_updated_at = UTC_TIMESTAMP() WHERE id = ?', [await hash(newPassword), await hash(newPin), req.admin.id])
+    } else {
+      if (newPassword && !validPassword(newPassword)) return res.status(400).json({ error: `Choose a password with at least ${PASSWORD_MIN} characters.` })
+      if (newPin && !validPin(newPin)) return res.status(400).json({ error: 'A PIN must be 6 to 10 digits.' })
+      const currentHash = rows[0].password_hash || process.env.ADMIN_PASSWORD_HASH
+      const current = req.body?.currentPassword
+      if (typeof current !== 'string' || current.length < 1 || current.length > 200) return res.status(400).json({ error: 'Enter your current password to confirm this change.' })
+      if (!currentHash || !(await argon2.verify(currentHash, current))) return res.status(401).json({ error: 'Your current password is not correct.' })
+      await db.execute('UPDATE admins SET password_hash = COALESCE(?, password_hash), pin_hash = COALESCE(?, pin_hash), password_updated_at = UTC_TIMESTAMP() WHERE id = ?', [newPassword ? await hash(newPassword) : null, newPin ? await hash(newPin) : null, req.admin.id])
+    }
     // Other devices are signed out after a credential change; this session stays valid.
     await db.execute('UPDATE admin_sessions SET revoked_at = UTC_TIMESTAMP() WHERE admin_id = ? AND id <> ? AND revoked_at IS NULL', [req.admin.id, req.admin.sid])
-    res.json({ ok: true })
+    res.json({ ok: true, defaultCredentialsRetired: usingDefaults })
   } catch (error) { next(error) }
 })
 

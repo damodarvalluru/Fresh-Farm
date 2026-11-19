@@ -23,6 +23,7 @@ function mapProfile(row) {
     lastLoginAt: row.last_login_at,
     hasPassword: Boolean(row.has_password),
     hasPin: Boolean(row.has_pin),
+    usingDefaultCredentials: !row.has_password && !row.has_pin,
     memberSince: row.created_at,
   }
 }

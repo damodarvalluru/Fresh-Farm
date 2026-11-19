@@ -23,6 +23,10 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
   const [pinError, setPinError] = useState('')
   const [pinBusy, setPinBusy] = useState(false)
 
+  const [defaultForm, setDefaultForm] = useState({ currentPassword: '', currentPin: '', newPassword: '', confirmPassword: '', newPin: '', confirmPin: '' })
+  const [defaultError, setDefaultError] = useState('')
+  const [defaultBusy, setDefaultBusy] = useState(false)
+
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -120,7 +124,49 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
     }
   }
 
+  async function replaceDefaults(event: FormEvent) {
+    event.preventDefault()
+    setDefaultError('')
+    if (defaultForm.newPassword !== defaultForm.confirmPassword) { setDefaultError('The new passwords do not match.'); return }
+    if (defaultForm.newPassword.length < 12) { setDefaultError('Use at least 12 characters for the new password.'); return }
+    if (defaultForm.newPin !== defaultForm.confirmPin) { setDefaultError('The new PINs do not match.'); return }
+    if (!/^\d{6,10}$/.test(defaultForm.newPin)) { setDefaultError('Use 6 to 10 digits for the new PIN.'); return }
+    setDefaultBusy(true)
+    try {
+      await adminFetch('/auth/admin/credentials', {
+        method: 'POST',
+        body: JSON.stringify({
+          currentPassword: defaultForm.currentPassword,
+          currentPin: defaultForm.currentPin,
+          newPassword: defaultForm.newPassword,
+          newPin: defaultForm.newPin,
+        }),
+      })
+      setDefaultForm({ currentPassword: '', currentPin: '', newPassword: '', confirmPassword: '', newPin: '', confirmPin: '' })
+      const result = await adminFetch<{ profile: AdminProfile }>('/admin/profile')
+      onUpdated(result.profile)
+      onNotify('Temporary credentials replaced. Use your new password and PIN from now on.')
+    } catch (error) {
+      setDefaultError(handleError(error))
+    } finally {
+      setDefaultBusy(false)
+    }
+  }
+
   return <div className="admin-stack">
+    {profile.usingDefaultCredentials && <section className="admin-card">
+      <header className="admin-card-head"><div><span className="admin-eyebrow">FIRST-TIME SETUP</span><h3>Replace temporary credentials</h3><p>The temporary password and PIN grant access only until you set your own. Replace both now; the defaults are then disabled permanently.</p></div></header>
+      <form className="admin-form-grid single" onSubmit={replaceDefaults}>
+        <label><span>Current temporary password</span><input type="password" autoComplete="current-password" required value={defaultForm.currentPassword} onChange={event => setDefaultForm({ ...defaultForm, currentPassword: event.target.value })} /></label>
+        <label><span>Current temporary PIN</span><input inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" required value={defaultForm.currentPin} onChange={event => setDefaultForm({ ...defaultForm, currentPin: event.target.value.replace(/\D/g, '') })} /></label>
+        <label><span>New password</span><input type="password" autoComplete="new-password" minLength={12} required value={defaultForm.newPassword} onChange={event => setDefaultForm({ ...defaultForm, newPassword: event.target.value })} /></label>
+        <label><span>Confirm new password</span><input type="password" autoComplete="new-password" minLength={12} required value={defaultForm.confirmPassword} onChange={event => setDefaultForm({ ...defaultForm, confirmPassword: event.target.value })} /></label>
+        <label><span>New PIN</span><input inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" required value={defaultForm.newPin} onChange={event => setDefaultForm({ ...defaultForm, newPin: event.target.value.replace(/\D/g, '') })} /></label>
+        <label><span>Confirm new PIN</span><input inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" required value={defaultForm.confirmPin} onChange={event => setDefaultForm({ ...defaultForm, confirmPin: event.target.value.replace(/\D/g, '') })} /></label>
+        {defaultError && <p className="admin-form-error" role="alert">{defaultError}</p>}
+        <button className="admin-btn" type="submit" disabled={defaultBusy}><ShieldCheck size={14} /> {defaultBusy ? 'Saving…' : 'Set my credentials'}</button>
+      </form>
+    </section>}
     <div className="admin-two-col profile-top">
       <section className="admin-card">
         <header className="admin-card-head"><div><span className="admin-eyebrow">STAFF IDENTITY</span><h3>Your profile</h3><p>This name appears on order timelines and expense records.</p></div></header>
@@ -155,8 +201,8 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
           <div><dt><UserRound size={14} /> Staff since</dt><dd>{adminWhen(profile.memberSince)}</dd></div>
           <div><dt>Last sign-in</dt><dd>{adminWhen(profile.lastLoginAt)}</dd></div>
           <div><dt>Password updated</dt><dd>{adminWhen(profile.passwordUpdatedAt)}</dd></div>
-          <div><dt>Password configured</dt><dd>{profile.hasPassword ? 'Yes' : 'Using owner bootstrap'}</dd></div>
-          <div><dt>PIN configured</dt><dd>{profile.hasPin ? 'Yes' : 'Not set'}</dd></div>
+          <div><dt>Password configured</dt><dd>{profile.hasPassword ? 'Yes' : profile.usingDefaultCredentials ? 'Temporary default' : 'Using owner bootstrap'}</dd></div>
+          <div><dt>PIN configured</dt><dd>{profile.hasPin ? 'Yes' : profile.usingDefaultCredentials ? 'Temporary default' : 'Not set'}</dd></div>
         </dl>
         <p className="admin-muted">Losing access? Use “Reset with owner password” on the sign-in screen. It rotates both credentials and revokes every existing staff session.</p>
       </section>

@@ -86,9 +86,11 @@ type AdminSetupStatus = {
   hasPassword: boolean
   hasPin: boolean
   emailRequired: boolean
+  defaultLoginAvailable: boolean
+  usingDefaultCredentials: boolean
 }
 
-type AdminMode = 'password' | 'pin' | 'setup' | 'reset'
+type AdminMode = 'password' | 'pin' | 'default' | 'setup' | 'reset'
 
 export function AdminLogin() {
   const router = useRouter()
@@ -106,7 +108,8 @@ export function AdminLogin() {
       .then((result: AdminSetupStatus | null) => {
         if (!alive || !result) return
         setStatus(result)
-        if (result.setupRequired) setMode('setup')
+        if (result.defaultLoginAvailable) setMode('default')
+        else if (result.setupRequired) setMode('setup')
       })
       .catch(() => { if (alive) setStatusError('Could not check the owner setup state. Password or PIN sign-in may still work.') })
     return () => { alive = false }
@@ -127,7 +130,15 @@ export function AdminLogin() {
     const body: Record<string, string> = {}
     let path = ''
     try {
-      if (mode === 'password') {
+      if (mode === 'default') {
+        path = '/auth/admin/default-login'
+        body.password = String(fields.get('password') || '')
+        body.pin = String(fields.get('pin') || '')
+        if (!status?.adminProvisioned) {
+          body.email = email
+          body.fullName = String(fields.get('fullName') || '').trim()
+        } else if (email) body.email = email
+      } else if (mode === 'password') {
         path = '/auth/admin/password-login'
         body.password = String(fields.get('password') || '')
         if (email) body.email = email
@@ -192,12 +203,14 @@ export function AdminLogin() {
   }
 
   const askForEmail = Boolean(status?.emailRequired) || Boolean(statusError)
-  const headline = mode === 'setup' ? <>Set up the<br/><em>farmhouse.</em></> : mode === 'reset' ? <>Restore staff<br/><em>access.</em></> : <>Welcome to the<br/><em>farmhouse.</em></>
+  const headline = mode === 'setup' ? <>Set up the<br/><em>farmhouse.</em></> : mode === 'reset' ? <>Restore staff<br/><em>access.</em></> : mode === 'default' ? <>First-time<br/><em>sign in.</em></> : <>Welcome to the<br/><em>farmhouse.</em></>
   const intro = mode === 'setup'
     ? 'Confirm the owner bootstrap password from the server, then choose the password and PIN you will use from now on.'
     : mode === 'reset'
       ? 'Use the owner bootstrap password to replace the sign-in password. Every existing staff session is revoked.'
-      : 'Sign in to manage orders, delivery, costs and the live farm analytics.'
+      : mode === 'default'
+        ? 'Enter the temporary password and PIN together. You will replace both with your own credentials in My profile.'
+        : 'Sign in to manage orders, delivery, costs and the live farm analytics.'
 
   return <main className="admin-auth-page">
     <Link href="/" className="admin-brand"><span className="brand-mark"><Leaf size={20}/></span>fresh<span>farm</span><small>FARMHOUSE</small></Link>
@@ -212,12 +225,18 @@ export function AdminLogin() {
         <span>{status.adminProvisioned ? 'An owner account already exists on this server.' : 'No staff credentials are set yet.'} The bootstrap password is checked server-side and is never stored in the browser.</span>
       </div>}
 
-      {status && !status.configured && mode !== 'setup' && <div className="admin-setup-note warn">
+      {mode === 'default' && <div className="admin-setup-note">
+        <b>Temporary first-time credentials</b>
+        <span>Both the password and PIN are checked together, once. Only their Argon2id hashes are stored on the server, and they stop working as soon as you set your own credentials in My profile.</span>
+      </div>}
+
+      {status && !status.configured && !status.defaultLoginAvailable && mode !== 'setup' && <div className="admin-setup-note warn">
         <b>Owner bootstrap is not configured</b>
         <span>Set ADMIN_PASSWORD_HASH on the API, or use Google staff sign-in if Firebase auth is configured.</span>
       </div>}
 
-      {mode !== 'setup' && <div className="admin-auth-tabs" role="tablist" aria-label="Sign-in method">
+      {mode !== 'setup' && mode !== 'reset' && <div className="admin-auth-tabs" role="tablist" aria-label="Sign-in method">
+        {status?.defaultLoginAvailable && <button type="button" role="tab" aria-selected={mode === 'default'} className={mode === 'default' ? 'active' : ''} onClick={() => switchMode('default')}><ShieldCheck size={14}/> First-time</button>}
         <button type="button" role="tab" aria-selected={mode === 'password'} className={mode === 'password' ? 'active' : ''} onClick={() => switchMode('password')}><LockKeyhole size={14}/> Password</button>
         <button type="button" role="tab" aria-selected={mode === 'pin'} className={mode === 'pin' ? 'active' : ''} onClick={() => switchMode('pin')}><KeyRound size={14}/> PIN</button>
       </div>}
@@ -242,6 +261,16 @@ export function AdminLogin() {
           <label htmlFor="admin-reset-pin">Replace PIN (optional)<input id="admin-reset-pin" name="newPin" inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" placeholder="6 to 10 digits"/></label>
         </>}
 
+        {mode === 'default' && <>
+          {!status?.adminProvisioned && <>
+            <label htmlFor="admin-default-email">Owner email<input id="admin-default-email" name="email" type="email" autoComplete="email" required placeholder="owner@freshfarm.example"/></label>
+            <label htmlFor="admin-default-name">Owner name<input id="admin-default-name" name="fullName" autoComplete="name" required placeholder="Your full name"/></label>
+          </>}
+          {status?.adminProvisioned && askForEmail && <label htmlFor="admin-default-email-existing">Staff email<input id="admin-default-email-existing" name="email" type="email" autoComplete="email" placeholder="Only needed with multiple staff accounts"/></label>}
+          <label htmlFor="admin-default-password">Temporary password<span className="password-input"><input id="admin-default-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required placeholder="Temporary owner password"/><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
+          <label htmlFor="admin-default-pin">Temporary PIN<input id="admin-default-pin" name="pin" inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" required placeholder="6 to 10 digits"/></label>
+        </>}
+
         {mode === 'password' && <>
           {askForEmail && <label htmlFor="admin-email-login">Staff email<input id="admin-email-login" name="email" type="email" autoComplete="email" placeholder="Only needed with multiple staff accounts"/></label>}
           <label htmlFor="admin-password">Admin password<span className="password-input"><input id="admin-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" required placeholder="Enter your password"/><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></span></label>
@@ -252,7 +281,7 @@ export function AdminLogin() {
           <label htmlFor="admin-pin">Sign-in PIN<input id="admin-pin" name="pin" inputMode="numeric" pattern="\d{6,10}" minLength={6} maxLength={10} autoComplete="off" required placeholder="6 to 10 digits"/></label>
         </>}
 
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'setup' ? 'Create owner credentials' : mode === 'reset' ? 'Reset staff credentials' : mode === 'pin' ? 'Sign in with PIN' : 'Secure sign in'}</button>
+        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : mode === 'setup' ? 'Create owner credentials' : mode === 'reset' ? 'Reset staff credentials' : mode === 'default' ? 'Sign in with temporary credentials' : mode === 'pin' ? 'Sign in with PIN' : 'Secure sign in'}</button>
         {message && <div role="alert" className="auth-message">{message}</div>}
         {statusError && <div role="status" className="auth-message">{statusError}</div>}
       </form>
@@ -261,6 +290,7 @@ export function AdminLogin() {
         {mode === 'setup'
           ? <button type="button" onClick={() => switchMode('password')}>Back to staff sign in</button>
           : <>
+            {status?.defaultLoginAvailable && mode !== 'default' && <button type="button" onClick={() => switchMode('default')}>First-time default sign-in</button>}
             {status?.setupRequired && <button type="button" onClick={() => switchMode('setup')}>First-time owner setup</button>}
             <button type="button" onClick={() => switchMode('reset')}>Forgot password? Reset with owner password</button>
           </>}
