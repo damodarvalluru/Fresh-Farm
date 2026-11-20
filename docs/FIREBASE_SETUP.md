@@ -43,7 +43,7 @@ Open **Authentication → Settings → Authorized domains**. `localhost` is incl
 
 ## 5. Put the values in both env files
 
-Root `.env.local`:
+Frontend `frontend/.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
@@ -53,7 +53,7 @@ NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=fresh-farm-1a2b3.firebaseapp.com
 NEXT_PUBLIC_FIREBASE_APP_ID=1:1234567890:web:abcdef
 ```
 
-Server `server/.env`:
+Server `backend/.env`:
 
 ```dotenv
 FIREBASE_PROJECT_ID=fresh-farm-1a2b3
@@ -63,15 +63,13 @@ The API uses the same project ID to verify tokens. Leave `FIREBASE_CLIENT_EMAIL`
 
 ## 6. Restart and test
 
-Restart `pnpm dev` and `cd server && npm run dev` so both processes read the new environment. Then open <http://localhost:3000/login> and choose **Continue with Google**.
+Restart `pnpm dev` and `cd backend && npm run dev` so both processes read the new environment. Then open <http://localhost:3000/login> and choose **Continue with Google**.
 
-## Staff Google sign-in
-
-Google staff sign-in additionally requires an active `admins` row. The repository owner account is provisioned for `damodarvalluru7@gmail.com`. Signing in with that Google account matches the provisioned admin by verified email and binds the Google UID to it. Any other Google account receives `403` until an owner provisions it in TiDB.
+Admin staff access does **not** use Google sign-in. It uses only the provisioned admin email and Argon2id-hashed password described in [admin security](ADMIN_SECURITY.md). Firebase/Google remains customer-only.
 
 ## Optional: stricter revocation checks
 
-To reject tokens that were revoked before they expire, create a service account under **Project settings → Service accounts → Generate new private key** and add to `server/.env`:
+To reject tokens that were revoked before they expire, create a service account under **Project settings → Service accounts → Generate new private key** and add to `backend/.env`:
 
 ```dotenv
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-...@<project>.iam.gserviceaccount.com
@@ -82,8 +80,8 @@ Keep that key out of source control. When present, the API uses the Firebase Adm
 
 ## Troubleshooting
 
-- **"Google sign-in needs Firebase"** — `.env.local` is missing `NEXT_PUBLIC_FIREBASE_API_KEY` or `NEXT_PUBLIC_FIREBASE_PROJECT_ID`; restart the Next dev server after adding them.
-- **"The Google sign-in could not be verified"** — `server/.env` has a different `FIREBASE_PROJECT_ID` than the web app, or the API was not restarted.
+- **"Google sign-in needs Firebase"** — `frontend/.env.local` is missing `NEXT_PUBLIC_FIREBASE_API_KEY` or `NEXT_PUBLIC_FIREBASE_PROJECT_ID`; restart the Next dev server after adding them.
+- **"The Google sign-in could not be verified"** — `backend/.env` has a different `FIREBASE_PROJECT_ID` than the web app, or the API was not restarted.
 - **`auth/operation-not-allowed`** — Google provider is not enabled in Authentication → Sign-in method.
 - **`auth/unauthorized-domain`** — add the hostname under Authentication → Settings → Authorized domains.
 - **`auth/popup-blocked`** — allow popups for the site, or use the email/password form.

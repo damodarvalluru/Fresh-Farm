@@ -1,6 +1,6 @@
 # Payments and order flow
 
-Fresh Farm takes orders through the Express API in `server/`. Prices are always recalculated on the server; the browser never supplies a trusted amount.
+Fresh Farm takes orders through the Express API in `backend/`. Prices are always recalculated on the server; the browser never supplies a trusted amount.
 
 ## Order creation
 
@@ -86,7 +86,7 @@ The `/api/backend` prefix is the Next.js rewrite to the API. Use `/api/payments/
 
 ## Notifications
 
-Order creation and confirmed online payments call `server/src/services/notify.js`:
+Order creation and confirmed online payments call `backend/src/services/notify.js`:
 
 - Resend sends the customer receipt from `RESEND_FROM`.
 - Twilio sends the owner a WhatsApp alert to `CONTACT_NOTIFY_WHATSAPP`, from `TWILIO_WHATSAPP_FROM`.

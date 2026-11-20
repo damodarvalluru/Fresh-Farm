@@ -10,6 +10,6 @@ The app keeps the admin session cookie on the storefront host by proxying `/api/
 
 ## Staff identities
 
-Staff password-only login is a distinct server route and does not use the customer login form. The API compares against an Argon2id hash in the server environment and issues an HTTP-only, Secure-in-production, SameSite=Lax cookie. The server persists a token hash in `admin_sessions`, checks revocation and database role on each protected request, and clears/revokes the session on logout. Google login verifies the Firebase ID token and then requires an active staff record and permitted role in TiDB.
+Admin email/password login is a distinct server route and does not use the customer login form. The API verifies the submitted password against the Argon2id hash stored in the `admins` table and issues an HTTP-only, Secure-in-production, SameSite=Lax cookie. The server persists a token hash in `admin_sessions`, checks revocation and database role on each protected request, and clears/revokes the session on logout. Only active staff records with permitted roles can sign in; Google login is customer-only and is not accepted for staff access.
 
 All staff APIs must use `requireAdmin` and action-specific `requireRoles`/permission checks. Hiding a dashboard route in the browser is not authorization. Do not add public staff registration.

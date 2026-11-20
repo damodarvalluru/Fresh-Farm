@@ -16,5 +16,5 @@ hosts. Each file is a 960 px JPEG thumbnail.
 | `seer-fish-steaks.jpg` | Seer fish (*Scomberomorus commerson*) | ppericard | [Commons](https://commons.wikimedia.org/wiki/File:Scomberomorus_commerson_Philippines.jpg) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0) |
 
 The commerce data (names, prices, stock, descriptions) is maintained in
-`database/seed.sql`. No cooked dishes or prepared foods are represented here:
+`backend/database/seed.sql`. No cooked dishes or prepared foods are represented here:
 the catalogue is limited to live fish, whole fresh fish and raw cuts.
