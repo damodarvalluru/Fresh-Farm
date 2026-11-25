@@ -36,11 +36,15 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
 
   function handleError(error: unknown) {
     const typed = error as Error & { status?: number }
-    if (typed.status === 401) {
+    const message = typed.message || 'The request could not be completed.'
+    // A wrong current password is also a 401, but it is an expected form
+    // validation error: keep the session and show the message next to the form.
+    // Only a lost/expired session should send the admin back to sign-in.
+    if (typed.status === 401 && /authentication required|session is invalid|session has expired/i.test(message)) {
       onUnauthorized()
       return 'Your session ended. Sign in again to continue.'
     }
-    return typed.message
+    return message
   }
 
   async function saveProfile(event: FormEvent) {
@@ -92,6 +96,7 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
         body: JSON.stringify({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword }),
       })
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setPinForm(previous => ({ ...previous, currentPassword: '' }))
       const result = await adminFetch<{ profile: AdminProfile }>('/admin/profile')
       onUpdated(result.profile)
       onNotify('Password changed. Other devices were signed out.')
@@ -114,6 +119,7 @@ export default function AdminProfilePanel({ profile, onUpdated, onNotify, onUnau
         body: JSON.stringify({ currentPassword: pinForm.currentPassword, newPin: pinForm.newPin }),
       })
       setPinForm({ currentPassword: '', newPin: '', confirmPin: '' })
+      setPasswordForm(previous => ({ ...previous, currentPassword: '' }))
       const result = await adminFetch<{ profile: AdminProfile }>('/admin/profile')
       onUpdated(result.profile)
       onNotify('Sign-in PIN updated.')
